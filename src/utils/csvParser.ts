@@ -29,28 +29,36 @@ export function parseCSVFile(file: File): Promise<CSVParseResult> {
 
 function validateAndTransformDevices(rawData: Record<string, unknown>[]): DeviceData[] {
   return rawData.map((row) => {
+    // Cast unknown values to strings safely
+    const getString = (value: unknown): string => {
+      if (typeof value === 'string') return value;
+      if (value === null || value === undefined) return '';
+      return String(value);
+    };
+
     // Get image URLs and handle empty cases gracefully
-    const imageUrls = row.image_urls?.split('|').map((url: string) => url.trim()).filter(Boolean) || [];
+    const imageUrlsStr = getString(row.image_urls);
+    const imageUrls = imageUrlsStr ? imageUrlsStr.split('|').map((url: string) => url.trim()).filter(Boolean) : [];
     
     // If no image URLs, we'll still create the device but with empty image fields
     // This allows the user to see the device in the interface even if no images are available
 
     return {
-      product_name: row.product_name || '',
-      manufacturer: row.manufacturer || '',
-      manuf_number: row.manuf_number || '',
-      gmdn_terms: row.gmdn_terms || '',
-      device_id: row.device_id || '',
-      search_query: row.search_query || '',
-      image_query: row.image_query || '',
-      manual_query: row.manual_query || '',
-      official_product_name: row.official_product_name || '',
-      image_url: row.image_url || imageUrls[0] || '',
-      image_urls: row.image_urls || '',
-      manual_url: row.manual_url || '',
-      manual_urls: row.manual_urls || '',
+      product_name: getString(row.product_name),
+      manufacturer: getString(row.manufacturer),
+      manuf_number: getString(row.manuf_number),
+      gmdn_terms: getString(row.gmdn_terms),
+      device_id: getString(row.device_id),
+      search_query: getString(row.search_query),
+      image_query: getString(row.image_query),
+      manual_query: getString(row.manual_query),
+      official_product_name: getString(row.official_product_name),
+      image_url: getString(row.image_url) || imageUrls[0] || '',
+      image_urls: getString(row.image_urls),
+      manual_url: getString(row.manual_url),
+      manual_urls: getString(row.manual_urls),
       status: 'pending' as const,
-      selected_image_url: row.image_url || imageUrls[0] || ''
+      selected_image_url: getString(row.image_url) || imageUrls[0] || ''
     };
   });
 }
