@@ -2,7 +2,6 @@
 
 import { useState } from 'react';
 import { X, Download, FileText, Settings } from 'lucide-react';
-import { cn } from '@/utils/cn';
 import type { ExportOptions } from '@/types/device';
 
 interface ExportModalProps {

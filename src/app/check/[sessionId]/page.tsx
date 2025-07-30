@@ -1,8 +1,8 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useParams, useRouter } from 'next/navigation';
-import { ArrowLeft, ArrowRight, Download, Save, SkipForward } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { ArrowLeft, Download, Save } from 'lucide-react';
 import { useAppStore, useCurrentBatch } from '@/store/useAppStore';
 import { BatchHeader } from '@/components/BatchHeader';
 import { DeviceRow } from '@/components/DeviceRow';
@@ -10,7 +10,6 @@ import { BatchControls } from '@/components/BatchControls';
 import { ExportModal } from '@/components/ExportModal';
 
 export default function CheckPage() {
-  const params = useParams();
   const router = useRouter();
   const { session, current_batch, setCurrentBatch, saveProgress, exportResults } = useAppStore();
   const currentBatch = useCurrentBatch();
@@ -168,7 +167,6 @@ export default function CheckPage() {
             totalBatches={session.total_batches}
             hasUncheckedItems={hasUncheckedItems}
             onPrevious={() => handleBatchNavigation(current_batch - 1)}
-            onNext={() => handleBatchNavigation(current_batch + 1)}
             onSaveAndNext={handleSaveAndNext}
             onSaveAndPause={handleSaveAndPause}
           />

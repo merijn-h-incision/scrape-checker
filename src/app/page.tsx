@@ -12,7 +12,7 @@ export default function HomePage() {
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [uploadSuccess, setUploadSuccess] = useState<string | null>(null);
   const router = useRouter();
-  const { setSession, setLoading } = useAppStore();
+  const { setSession } = useAppStore();
 
   const handleFileUpload = useCallback(async (file: File) => {
     if (!file.name.toLowerCase().endsWith('.csv')) {
@@ -183,7 +183,7 @@ export default function HomePage() {
                 <li><code className="bg-muted px-1 rounded">product_name</code> - Device name</li>
                 <li><code className="bg-muted px-1 rounded">manufacturer</code> - Company name</li>
                 <li><code className="bg-muted px-1 rounded">manuf_number</code> - Model number</li>
-                <li><code className="bg-muted px-1 rounded">image_urls</code> - Image URLs separated by " | "</li>
+                <li><code className="bg-muted px-1 rounded">image_urls</code> - Image URLs separated by {'" | "'}</li>
                 <li><code className="bg-muted px-1 rounded">manual_urls</code> - Manual URLs (optional)</li>
               </ul>
               <p className="text-xs mt-3">

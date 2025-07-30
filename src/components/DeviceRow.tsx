@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Check, X, Flag, ArrowRight, ExternalLink, FileText } from 'lucide-react';
+import { Check, X, Flag, ExternalLink, FileText } from 'lucide-react';
 import { useAppStore } from '@/store/useAppStore';
 import { getImageUrls, getManualUrls, formatDeviceTitle, getStatusColor, getStatusLabel } from '@/utils/csvParser';
 import { ImageWithFallback } from './ImageWithFallback';

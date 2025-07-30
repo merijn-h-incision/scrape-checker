@@ -8,7 +8,6 @@ interface BatchControlsProps {
   totalBatches: number;
   hasUncheckedItems: boolean;
   onPrevious: () => void;
-  onNext: () => void;
   onSaveAndNext: () => void;
   onSaveAndPause: () => void;
 }
@@ -18,7 +17,6 @@ export function BatchControls({
   totalBatches,
   hasUncheckedItems,
   onPrevious,
-  onNext,
   onSaveAndNext,
   onSaveAndPause
 }: BatchControlsProps) {

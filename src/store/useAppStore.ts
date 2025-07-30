@@ -121,7 +121,7 @@ export const useAppStore = create<AppStore>()(
 
         // Prepare export data
         const exportData = devicesToExport.map(device => {
-          const result: any = {
+          const result: Record<string, unknown> = {
             product_name: device.product_name,
             manufacturer: device.manufacturer,
             manuf_number: device.manuf_number,
@@ -173,7 +173,7 @@ export const useAppStore = create<AppStore>()(
         }
       },
 
-      loadProgress: (sessionId: string) => {
+      loadProgress: () => {
         // This will be handled by the persist middleware
         // Additional loading logic can be added here if needed
         set({ is_loading: true });
@@ -196,7 +196,7 @@ export const useAppStore = create<AppStore>()(
 );
 
 // Utility functions
-function convertToCSV(data: any[]): string {
+function convertToCSV(data: Record<string, unknown>[]): string {
   if (data.length === 0) return '';
 
   const headers = Object.keys(data[0]);

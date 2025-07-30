@@ -27,8 +27,8 @@ export function parseCSVFile(file: File): Promise<CSVParseResult> {
   });
 }
 
-function validateAndTransformDevices(rawData: any[]): DeviceData[] {
-  return rawData.map((row, index) => {
+function validateAndTransformDevices(rawData: Record<string, unknown>[]): DeviceData[] {
+  return rawData.map((row) => {
     // Get image URLs and handle empty cases gracefully
     const imageUrls = row.image_urls?.split('|').map((url: string) => url.trim()).filter(Boolean) || [];
     
