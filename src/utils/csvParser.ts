@@ -10,7 +10,7 @@ export function parseCSVFile(file: File): Promise<CSVParseResult> {
       transform: (value: string) => value.trim(),
       complete: (results) => {
         try {
-          const devices = validateAndTransformDevices(results.data);
+          const devices = validateAndTransformDevices(results.data as Record<string, unknown>[]);
           resolve({
             data: devices,
             errors: results.errors.map(err => err.message),
