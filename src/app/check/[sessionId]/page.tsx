@@ -1,0 +1,213 @@
+'use client';
+
+import { useEffect, useState } from 'react';
+import { useParams, useRouter } from 'next/navigation';
+import { ArrowLeft, ArrowRight, Download, Save, SkipForward } from 'lucide-react';
+import { useAppStore, useCurrentBatch } from '@/store/useAppStore';
+import { BatchHeader } from '@/components/BatchHeader';
+import { DeviceRow } from '@/components/DeviceRow';
+import { BatchControls } from '@/components/BatchControls';
+import { ExportModal } from '@/components/ExportModal';
+
+export default function CheckPage() {
+  const params = useParams();
+  const router = useRouter();
+  const { session, current_batch, setCurrentBatch, saveProgress, exportResults } = useAppStore();
+  const currentBatch = useCurrentBatch();
+  const [showExportModal, setShowExportModal] = useState(false);
+
+  // Redirect if no session
+  useEffect(() => {
+    if (!session) {
+      router.push('/');
+    }
+  }, [session, router]);
+
+  // Keyboard navigation
+  useEffect(() => {
+    const handleKeyPress = (e: KeyboardEvent) => {
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
+        return; // Don't handle if user is typing
+      }
+
+      switch (e.key) {
+        case 'ArrowLeft':
+        case 'p':
+          if (current_batch > 1) {
+            setCurrentBatch(current_batch - 1);
+          }
+          break;
+        case 'ArrowRight':
+        case 'n':
+          if (session && current_batch < session.total_batches) {
+            setCurrentBatch(current_batch + 1);
+          }
+          break;
+        case 's':
+          e.preventDefault();
+          saveProgress();
+          break;
+        case 'e':
+          e.preventDefault();
+          setShowExportModal(true);
+          break;
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyPress);
+    return () => window.removeEventListener('keydown', handleKeyPress);
+  }, [current_batch, session, setCurrentBatch, saveProgress]);
+
+  if (!session || !currentBatch) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center space-y-4">
+          <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin mx-auto"></div>
+          <p className="text-muted-foreground">Loading session...</p>
+        </div>
+      </div>
+    );
+  }
+
+  const handleBatchNavigation = (batchNumber: number) => {
+    if (batchNumber >= 1 && batchNumber <= session.total_batches) {
+      setCurrentBatch(batchNumber);
+    }
+  };
+
+  const handleSaveAndNext = () => {
+    saveProgress();
+    if (current_batch < session.total_batches) {
+      setCurrentBatch(current_batch + 1);
+    }
+  };
+
+  const handleSaveAndPause = () => {
+    saveProgress();
+  };
+
+  const hasUncheckedItems = currentBatch.devices.some(d => d.status === 'pending');
+
+  return (
+    <div className="min-h-screen bg-background">
+      {/* Header */}
+      <header className="sticky top-0 z-50 border-b border-border bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/60">
+        <div className="max-w-6xl mx-auto px-6 py-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-4">
+              <button
+                onClick={() => router.push('/')}
+                className="flex items-center space-x-2 text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <ArrowLeft className="w-4 h-4" />
+                <span className="text-sm">Back to Upload</span>
+              </button>
+              
+              <div className="border-l border-border pl-4">
+                <h1 className="text-lg font-semibold text-foreground">
+                  {session.filename}
+                </h1>
+                <p className="text-sm text-muted-foreground">
+                  Batch {current_batch} of {session.total_batches} • {session.total_rows} total devices
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center space-x-2">
+              <button
+                onClick={handleSaveAndPause}
+                className="flex items-center space-x-2 px-3 py-2 text-sm border border-border rounded-lg hover:bg-accent transition-colors"
+              >
+                <Save className="w-4 h-4" />
+                <span>Save Progress</span>
+              </button>
+              
+              <button
+                onClick={() => setShowExportModal(true)}
+                className="flex items-center space-x-2 px-3 py-2 text-sm bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors"
+              >
+                <Download className="w-4 h-4" />
+                <span>Export</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      {/* Main Content */}
+      <main className="max-w-6xl mx-auto px-6 py-8">
+        <div className="space-y-6">
+          {/* Batch Header */}
+          <BatchHeader
+            current={current_batch}
+            total={session.total_batches}
+            completed={currentBatch.completed_count}
+            totalDevices={currentBatch.total_count}
+            progress={session.progress_percentage}
+            onNavigate={handleBatchNavigation}
+          />
+
+          {/* Device Rows */}
+          <div className="space-y-6">
+            {currentBatch.devices.map((device, index) => {
+              const globalIndex = (current_batch - 1) * 10 + index;
+              return (
+                <DeviceRow
+                  key={device.device_id || globalIndex}
+                  device={device}
+                  deviceIndex={globalIndex}
+                  rowNumber={index + 1}
+                />
+              );
+            })}
+          </div>
+
+          {/* Batch Controls */}
+          <BatchControls
+            currentBatch={current_batch}
+            totalBatches={session.total_batches}
+            hasUncheckedItems={hasUncheckedItems}
+            onPrevious={() => handleBatchNavigation(current_batch - 1)}
+            onNext={() => handleBatchNavigation(current_batch + 1)}
+            onSaveAndNext={handleSaveAndNext}
+            onSaveAndPause={handleSaveAndPause}
+          />
+        </div>
+      </main>
+
+      {/* Keyboard Shortcuts Help */}
+      <div className="fixed bottom-4 right-4 bg-card border border-border rounded-lg p-4 shadow-lg max-w-xs">
+        <h4 className="text-sm font-medium text-foreground mb-2">Keyboard Shortcuts</h4>
+        <div className="space-y-1 text-xs text-muted-foreground">
+          <div className="flex justify-between">
+            <span>Previous batch:</span>
+            <code className="bg-muted px-1 rounded">← or P</code>
+          </div>
+          <div className="flex justify-between">
+            <span>Next batch:</span>
+            <code className="bg-muted px-1 rounded">→ or N</code>
+          </div>
+          <div className="flex justify-between">
+            <span>Save progress:</span>
+            <code className="bg-muted px-1 rounded">S</code>
+          </div>
+          <div className="flex justify-between">
+            <span>Export:</span>
+            <code className="bg-muted px-1 rounded">E</code>
+          </div>
+        </div>
+      </div>
+
+      {/* Export Modal */}
+      {showExportModal && (
+        <ExportModal
+          onClose={() => setShowExportModal(false)}
+          onExport={(options) => {
+            exportResults(options);
+            setShowExportModal(false);
+          }}
+        />
+      )}
+    </div>
+  );
+} 

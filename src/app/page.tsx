@@ -1,102 +1,206 @@
-import Image from "next/image";
+'use client';
 
-export default function Home() {
+import { useState, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
+import { Upload, FileText, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { useAppStore } from '@/store/useAppStore';
+import { parseCSVFile, createSessionFromDevices } from '@/utils/csvParser';
+
+export default function HomePage() {
+  const [isDragOver, setIsDragOver] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [uploadSuccess, setUploadSuccess] = useState<string | null>(null);
+  const router = useRouter();
+  const { setSession, setLoading } = useAppStore();
+
+  const handleFileUpload = useCallback(async (file: File) => {
+    if (!file.name.toLowerCase().endsWith('.csv')) {
+      setUploadError('Please upload a CSV file.');
+      return;
+    }
+
+    setIsUploading(true);
+    setUploadError(null);
+    setUploadSuccess(null);
+
+    try {
+      const result = await parseCSVFile(file);
+      
+      if (result.errors.length > 0) {
+        setUploadError(`CSV parsing errors: ${result.errors.join(', ')}`);
+        return;
+      }
+
+      if (result.data.length === 0) {
+        setUploadError('No valid device data found in the CSV file.');
+        return;
+      }
+
+      const session = createSessionFromDevices(result.data, file.name);
+      setSession(session);
+      
+      setUploadSuccess(`Successfully loaded ${result.data.length} devices!`);
+      
+      // Navigate to checking interface after a short delay
+      setTimeout(() => {
+        router.push(`/check/${session.id}`);
+      }, 1500);
+
+    } catch (error) {
+      setUploadError(
+        error instanceof Error 
+          ? error.message 
+          : 'Failed to process the CSV file. Please check the format.'
+      );
+    } finally {
+      setIsUploading(false);
+    }
+  }, [setSession, router]);
+
+  const handleDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOver(false);
+    
+    const files = Array.from(e.dataTransfer.files);
+    if (files.length > 0) {
+      handleFileUpload(files[0]);
+    }
+  }, [handleFileUpload]);
+
+  const handleFileSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    if (files.length > 0) {
+      handleFileUpload(files[0]);
+    }
+  }, [handleFileUpload]);
+
   return (
-    <div className="font-sans grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="font-mono list-inside list-decimal text-sm/6 text-center sm:text-left">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] font-mono font-semibold px-1 py-0.5 rounded">
-              src/app/page.tsx
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
+    <div className="min-h-screen bg-background">
+      {/* Header */}
+      <header className="border-b border-border bg-card shadow-sm">
+        <div className="max-w-4xl mx-auto px-6 py-4">
+          <div className="flex items-center space-x-3">
+            <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
+              <FileText className="w-5 h-5 text-primary-foreground" />
+            </div>
+            <div>
+              <h1 className="text-xl font-semibold text-foreground">
+                Medical Device Image Checker
+              </h1>
+              <p className="text-sm text-muted-foreground">
+                Upload your device results CSV to start checking images
+              </p>
+            </div>
+          </div>
+        </div>
+      </header>
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+      {/* Main Content */}
+      <main className="max-w-4xl mx-auto px-6 py-12">
+        <div className="space-y-8">
+          {/* Upload Area */}
+          <div className="bg-card rounded-lg border border-border shadow-sm p-8">
+            <div className="text-center space-y-6">
+              <div className="space-y-2">
+                <h2 className="text-2xl font-semibold text-foreground">
+                  Upload Device Results
+                </h2>
+                <p className="text-muted-foreground max-w-md mx-auto">
+                  Upload a CSV file from your scraping results (Stryker, Arthrex, etc.) 
+                  to start the image checking process.
+                </p>
+              </div>
+
+              {/* File Drop Zone */}
+              <div
+                className={`
+                  relative border-2 border-dashed rounded-lg p-12 transition-colors
+                  ${isDragOver 
+                    ? 'border-primary bg-primary/5' 
+                    : 'border-border hover:border-primary/50'
+                  }
+                  ${isUploading ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
+                `}
+                onDrop={handleDrop}
+                onDragOver={(e) => { e.preventDefault(); setIsDragOver(true); }}
+                onDragLeave={() => setIsDragOver(false)}
+                onClick={() => document.getElementById('file-upload')?.click()}
+              >
+                <div className="space-y-4">
+                  <div className="mx-auto w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center">
+                    <Upload className={`w-8 h-8 text-primary ${isUploading ? 'animate-pulse' : ''}`} />
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <p className="text-lg font-medium text-foreground">
+                      {isUploading ? 'Processing file...' : 'Drop your CSV file here'}
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      or click to browse files
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      Supports CSV files with device image data
+                    </p>
+                  </div>
+                </div>
+
+                <input
+                  id="file-upload"
+                  type="file"
+                  accept=".csv"
+                  onChange={handleFileSelect}
+                  className="hidden"
+                  disabled={isUploading}
+                />
+              </div>
+
+              {/* Status Messages */}
+              {uploadError && (
+                <div className="flex items-center justify-center space-x-2 p-4 bg-destructive/10 border border-destructive/20 rounded-lg">
+                  <AlertCircle className="w-5 h-5 text-destructive" />
+                  <p className="text-sm text-destructive">{uploadError}</p>
+                </div>
+              )}
+
+              {uploadSuccess && (
+                <div className="flex items-center justify-center space-x-2 p-4 bg-success/10 border border-success/20 rounded-lg">
+                  <CheckCircle2 className="w-5 h-5 text-success" />
+                  <p className="text-sm text-success">{uploadSuccess}</p>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Instructions */}
+          <div className="bg-muted/30 rounded-lg p-6">
+            <h3 className="text-lg font-medium text-foreground mb-4">
+              Expected CSV Format
+            </h3>
+            <div className="space-y-3 text-sm text-muted-foreground">
+              <p>Your CSV file should include these columns:</p>
+              <ul className="list-disc list-inside space-y-1 ml-4">
+                <li><code className="bg-muted px-1 rounded">product_name</code> - Device name</li>
+                <li><code className="bg-muted px-1 rounded">manufacturer</code> - Company name</li>
+                <li><code className="bg-muted px-1 rounded">manuf_number</code> - Model number</li>
+                <li><code className="bg-muted px-1 rounded">image_urls</code> - Image URLs separated by " | "</li>
+                <li><code className="bg-muted px-1 rounded">manual_urls</code> - Manual URLs (optional)</li>
+              </ul>
+              <p className="text-xs mt-3">
+                Files are processed in batches of 10 devices for optimal performance.
+              </p>
+            </div>
+          </div>
         </div>
       </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
+
+      {/* Footer */}
+      <footer className="border-t border-border bg-card mt-12">
+        <div className="max-w-4xl mx-auto px-6 py-6">
+          <p className="text-center text-sm text-muted-foreground">
+            Built for medical device image verification and quality control
+          </p>
+        </div>
       </footer>
     </div>
   );
