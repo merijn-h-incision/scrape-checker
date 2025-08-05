@@ -29,7 +29,7 @@ export interface DeviceData {
   row_index?: number;
 }
 
-export type DeviceStatus = 'pending' | 'approved' | 'custom_selected' | 'skipped' | 'flagged';
+export type DeviceStatus = 'pending' | 'approved' | 'custom_selected' | 'skipped' | 'rejected';
 
 export interface CheckingSession {
   id: string;

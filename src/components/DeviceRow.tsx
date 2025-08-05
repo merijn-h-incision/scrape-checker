@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Check, X, Flag, ExternalLink, FileText } from 'lucide-react';
+import { Check, X, XCircle, ExternalLink, FileText } from 'lucide-react';
 import { useAppStore } from '@/store/useAppStore';
 import { getImageUrls, getManualUrls, formatDeviceTitle, getStatusColor, getStatusLabel } from '@/utils/csvParser';
 import { ImageWithFallback } from './ImageWithFallback';
@@ -116,17 +116,17 @@ export function DeviceRow({ device, deviceIndex, rowNumber }: DeviceRowProps) {
             </button>
             
             <button
-              onClick={() => handleStatusChange('flagged')}
+              onClick={() => handleStatusChange('rejected')}
               className={`
                 flex items-center space-x-1 px-3 py-2 rounded-lg text-sm font-medium transition-colors
-                ${device.status === 'flagged' 
-                  ? 'bg-warning text-white' 
-                  : 'border border-border hover:bg-warning/10 hover:border-warning'
+                ${device.status === 'rejected' 
+                  ? 'bg-destructive text-destructive-foreground' 
+                  : 'border border-border hover:bg-destructive/10 hover:border-destructive'
                 }
               `}
             >
-              <Flag className="w-4 h-4" />
-              <span>Flag</span>
+              <XCircle className="w-4 h-4" />
+              <span>Reject</span>
             </button>
           </div>
         </div>

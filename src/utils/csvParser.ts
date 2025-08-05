@@ -130,7 +130,7 @@ export function calculateBatchProgress(devices: DeviceData[], batchNumber: numbe
   const batchDevices = devices.slice(startIndex, endIndex);
   
   const completed = batchDevices.filter(d => 
-    d.status === 'approved' || d.status === 'custom_selected'
+    d.status === 'approved' || d.status === 'custom_selected' || d.status === 'rejected'
   ).length;
   
   return {
@@ -148,8 +148,8 @@ export function getStatusColor(status: DeviceData['status']): string {
       return 'bg-primary text-white';
     case 'skipped':
       return 'bg-muted text-muted-foreground';
-    case 'flagged':
-      return 'bg-warning text-white';
+    case 'rejected':
+      return 'bg-destructive text-destructive-foreground';
     default:
       return 'bg-accent text-accent-foreground';
   }
@@ -163,8 +163,8 @@ export function getStatusLabel(status: DeviceData['status']): string {
       return 'Custom';
     case 'skipped':
       return 'Skipped';
-    case 'flagged':
-      return 'Flagged';
+    case 'rejected':
+      return 'Rejected';
     default:
       return 'Pending';
   }

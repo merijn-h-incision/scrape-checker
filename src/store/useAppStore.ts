@@ -47,7 +47,7 @@ export const useAppStore = create<AppStore>()(
 
         // Calculate progress
         const completedCount = updatedDevices.filter(d => 
-          d.status === 'approved' || d.status === 'custom_selected'
+          d.status === 'approved' || d.status === 'custom_selected' || d.status === 'rejected'
         ).length;
         const progress = (completedCount / updatedDevices.length) * 100;
 
@@ -115,7 +115,7 @@ export const useAppStore = create<AppStore>()(
         // Filter devices based on options
         if (options.only_completed) {
           devicesToExport = devicesToExport.filter(d => 
-            d.status === 'approved' || d.status === 'custom_selected'
+            d.status === 'approved' || d.status === 'custom_selected' || d.status === 'rejected'
           );
         }
 
@@ -244,9 +244,9 @@ export const useCurrentBatch = () => {
   return {
     batch_number: current_batch,
     devices,
-    completed_count: devices.filter(d => d.status === 'approved' || d.status === 'custom_selected').length,
+    completed_count: devices.filter(d => d.status === 'approved' || d.status === 'custom_selected' || d.status === 'rejected').length,
     total_count: devices.length,
-    is_completed: devices.every(d => d.status === 'approved' || d.status === 'custom_selected' || d.status === 'skipped')
+    is_completed: devices.every(d => d.status === 'approved' || d.status === 'custom_selected' || d.status === 'rejected' || d.status === 'skipped')
   };
 };
 

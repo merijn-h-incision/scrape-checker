@@ -64,7 +64,7 @@ export function ExportModal({ onClose, onExport }: ExportModalProps) {
                     Only completed devices
                   </span>
                   <p className="text-xs text-muted-foreground">
-                    Export only devices that have been approved or custom selected
+                    Export only devices that have been approved, custom selected, or rejected
                   </p>
                 </div>
               </label>
