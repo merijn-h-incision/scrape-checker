@@ -27,6 +27,10 @@ export interface DeviceData {
   checker_notes?: string;
   batch_id?: number;
   row_index?: number;
+  
+  // Material categorization (added by app)
+  material_category?: string;
+  material_subcategory?: string;
 }
 
 export type DeviceStatus = 'pending' | 'approved' | 'custom_selected' | 'skipped' | 'rejected';

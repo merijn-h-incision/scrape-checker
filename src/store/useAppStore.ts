@@ -26,7 +26,9 @@ export const useAppStore = create<AppStore>()(
             row_index: (index % 10) + 1,
             status: device.status || 'pending',
             selected_image_url: device.selected_image_url || device.image_url,
-            selected_manual_url: device.selected_manual_url || device.manual_url
+            selected_manual_url: device.selected_manual_url || device.manual_url,
+            material_category: device.material_category || '',
+            material_subcategory: device.material_subcategory || ''
           }))
         };
         
@@ -119,7 +121,7 @@ export const useAppStore = create<AppStore>()(
           );
         }
 
-        // Prepare export data
+                  // Prepare export data
         const exportData = devicesToExport.map(device => {
           const result: Record<string, unknown> = {
             product_name: device.product_name,
@@ -129,7 +131,9 @@ export const useAppStore = create<AppStore>()(
             device_id: device.device_id,
             search_query: device.search_query,
             official_product_name: device.official_product_name,
-            status: device.status || 'pending'
+            status: device.status || 'pending',
+            'MATERIAL CATEGORY': device.material_category || '',
+            'MATERIAL SUBCATEGORY': device.material_subcategory || ''
           };
 
           // Handle image URLs based on options

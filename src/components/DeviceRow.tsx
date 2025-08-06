@@ -1,9 +1,10 @@
 'use client';
 
 import { useState } from 'react';
-import { Check, X, XCircle, ExternalLink, FileText } from 'lucide-react';
+import { Check, X, XCircle, ExternalLink, FileText, Tag } from 'lucide-react';
 import { useAppStore } from '@/store/useAppStore';
 import { getImageUrls, getManualUrls, formatDeviceTitle, getStatusColor, getStatusLabel } from '@/utils/csvParser';
+import { MATERIAL_CATEGORIES, getSubcategoriesForCategory, hasSubcategories } from '@/utils/categories';
 import { ImageWithFallback } from './ImageWithFallback';
 import { ImageThumbnail } from './ImageThumbnail';
 import type { DeviceData } from '@/types/device';
@@ -19,6 +20,8 @@ export function DeviceRow({ device, deviceIndex, rowNumber }: DeviceRowProps) {
   const [selectedImageUrl, setSelectedImageUrl] = useState(device.selected_image_url || device.image_url);
   const [selectedManualUrl, setSelectedManualUrl] = useState(device.selected_manual_url || device.manual_url);
   const [notes, setNotes] = useState(device.checker_notes || '');
+  const [materialCategory, setMaterialCategory] = useState(device.material_category || '');
+  const [materialSubcategory, setMaterialSubcategory] = useState(device.material_subcategory || '');
   
   const imageUrls = getImageUrls(device);
   const manualUrls = getManualUrls(device);
@@ -46,6 +49,22 @@ export function DeviceRow({ device, deviceIndex, rowNumber }: DeviceRowProps) {
   const handleNotesChange = (newNotes: string) => {
     setNotes(newNotes);
     updateDevice(deviceIndex, { checker_notes: newNotes });
+  };
+
+  const handleCategoryChange = (category: string) => {
+    setMaterialCategory(category);
+    // Reset subcategory if switching to a category that doesn't have subcategories
+    if (!hasSubcategories(category)) {
+      setMaterialSubcategory('');
+      updateDevice(deviceIndex, { material_category: category, material_subcategory: '' });
+    } else {
+      updateDevice(deviceIndex, { material_category: category });
+    }
+  };
+
+  const handleSubcategoryChange = (subcategory: string) => {
+    setMaterialSubcategory(subcategory);
+    updateDevice(deviceIndex, { material_subcategory: subcategory });
   };
 
   const statusColor = getStatusColor(device.status);
@@ -316,6 +335,76 @@ export function DeviceRow({ device, deviceIndex, rowNumber }: DeviceRowProps) {
             className="w-full px-3 py-2 border border-border rounded-lg bg-background text-foreground placeholder-muted-foreground resize-none focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent"
             rows={2}
           />
+        </div>
+
+        {/* Material Category Section */}
+        <div className="mt-6 pt-6 border-t border-border">
+          <div className="flex items-center space-x-2 mb-4">
+            <Tag className="w-4 h-4 text-primary" />
+            <h4 className="text-sm font-medium text-foreground">Material Classification (Optional)</h4>
+          </div>
+          
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            {/* Category Dropdown */}
+            <div>
+              <label htmlFor={`category-${deviceIndex}`} className="block text-sm font-medium text-foreground mb-2">
+                Material Category
+              </label>
+              <select
+                id={`category-${deviceIndex}`}
+                value={materialCategory}
+                onChange={(e) => handleCategoryChange(e.target.value)}
+                className="w-full px-3 py-2 border border-border rounded-lg bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent"
+              >
+                <option value="">Select category...</option>
+                {MATERIAL_CATEGORIES.map((category) => (
+                  <option key={category} value={category}>
+                    {category}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Subcategory Dropdown */}
+            <div>
+              <label htmlFor={`subcategory-${deviceIndex}`} className="block text-sm font-medium text-foreground mb-2">
+                Material Subcategory
+              </label>
+              <select
+                id={`subcategory-${deviceIndex}`}
+                value={materialSubcategory}
+                onChange={(e) => handleSubcategoryChange(e.target.value)}
+                disabled={!materialCategory || !hasSubcategories(materialCategory)}
+                className="w-full px-3 py-2 border border-border rounded-lg bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent disabled:bg-muted disabled:text-muted-foreground disabled:cursor-not-allowed"
+              >
+                <option value="">
+                  {!materialCategory 
+                    ? "Select category first..." 
+                    : !hasSubcategories(materialCategory) 
+                    ? "No subcategories available" 
+                    : "Select subcategory..."
+                  }
+                </option>
+                {materialCategory && hasSubcategories(materialCategory) && 
+                  getSubcategoriesForCategory(materialCategory).map((subcategory) => (
+                    <option key={subcategory} value={subcategory}>
+                      {subcategory}
+                    </option>
+                  ))
+                }
+              </select>
+            </div>
+          </div>
+
+          {/* Category Info */}
+          {materialCategory && (
+            <div className="mt-3 p-3 bg-muted/30 rounded-lg">
+              <p className="text-xs text-muted-foreground">
+                <strong>Selected:</strong> {materialCategory}
+                {materialSubcategory && ` → ${materialSubcategory}`}
+              </p>
+            </div>
+          )}
         </div>
       </div>
     </div>
