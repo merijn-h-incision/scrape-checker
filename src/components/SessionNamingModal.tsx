@@ -108,7 +108,7 @@ export function SessionNamingModal({
               autoFocus
             />
             <p className="text-xs text-muted-foreground mt-1">
-              Leave empty to use "{defaultName}"
+              Leave empty to use &quot;{defaultName}&quot;
             </p>
           </div>
 

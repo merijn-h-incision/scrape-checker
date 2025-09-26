@@ -36,7 +36,7 @@ export function useAutoSave() {
         intervalRef.current = null;
       }
     };
-  }, [session?.session_id, saveProgressToCloud]); // Re-run when session changes
+  }, [session, saveProgressToCloud]); // Re-run when session changes
 
   // Manual save function
   const saveNow = async () => {

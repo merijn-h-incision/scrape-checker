@@ -230,7 +230,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
         }
       },
 
-      loadProgressFromCloud: async (sessionId: string) => {
+      loadProgressFromCloud: async (_sessionId: string) => {
         // For now, we'll show a helpful message since server-side session loading
         // requires storing blob URL mappings in a database
         throw new Error('Session loading from cloud requires additional setup. Sessions are auto-saved every minute while working.');

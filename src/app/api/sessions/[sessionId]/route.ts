@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import type { CheckingSession } from '@/types/device';
 
 export async function GET(
   request: NextRequest,

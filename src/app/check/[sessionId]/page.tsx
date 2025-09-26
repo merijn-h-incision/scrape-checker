@@ -14,7 +14,7 @@ export default function CheckPage() {
   const router = useRouter();
   const { session, current_batch, setCurrentBatch, saveProgress, exportResults } = useAppStore();
   const currentBatch = useCurrentBatch();
-  const { saveNow, isAutoSaveActive, sessionId } = useAutoSave();
+  const { saveNow, isAutoSaveActive } = useAutoSave();
   const [showExportModal, setShowExportModal] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
@@ -24,6 +24,18 @@ export default function CheckPage() {
       router.push('/');
     }
   }, [session, router]);
+
+  // Save functions
+  const handleSaveAndPause = async () => {
+    setIsSaving(true);
+    try {
+      await saveNow();
+    } catch (error) {
+      console.error('Save failed:', error);
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
   // Keyboard navigation
   useEffect(() => {
@@ -58,7 +70,7 @@ export default function CheckPage() {
 
     window.addEventListener('keydown', handleKeyPress);
     return () => window.removeEventListener('keydown', handleKeyPress);
-  }, [current_batch, session, setCurrentBatch, saveProgress]);
+  }, [current_batch, session, setCurrentBatch, saveProgress, handleSaveAndPause]);
 
   if (!session || !currentBatch) {
     return (
@@ -84,17 +96,6 @@ export default function CheckPage() {
       if (current_batch < session.total_batches) {
         setCurrentBatch(current_batch + 1);
       }
-    } catch (error) {
-      console.error('Save failed:', error);
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
-  const handleSaveAndPause = async () => {
-    setIsSaving(true);
-    try {
-      await saveNow();
     } catch (error) {
       console.error('Save failed:', error);
     } finally {
