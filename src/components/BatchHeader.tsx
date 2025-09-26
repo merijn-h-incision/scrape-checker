@@ -2,6 +2,7 @@
 
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { cn } from '@/utils/cn';
+import { BatchCarousel } from './BatchCarousel';
 
 interface BatchHeaderProps {
   current: number;
@@ -106,32 +107,12 @@ export function BatchHeader({
           </div>
         </div>
 
-        {/* Batch Grid Navigation */}
-        <div className="pt-2 border-t border-border">
-          <p className="text-sm text-muted-foreground mb-3">Quick Jump to Batch:</p>
-          <div className="grid grid-cols-10 gap-2">
-            {Array.from({ length: Math.min(total, 50) }, (_, i) => i + 1).map((batchNum) => (
-              <button
-                key={batchNum}
-                onClick={() => onNavigate(batchNum)}
-                className={cn(
-                  "w-8 h-8 rounded-lg text-xs font-medium transition-colors",
-                  batchNum === current
-                    ? "bg-primary text-primary-foreground"
-                    : "bg-muted hover:bg-accent border border-border hover:border-primary"
-                )}
-                title={`Go to batch ${batchNum}`}
-              >
-                {batchNum}
-              </button>
-            ))}
-            {total > 50 && (
-              <div className="w-8 h-8 rounded-lg bg-muted border border-border flex items-center justify-center text-xs text-muted-foreground">
-                ...
-              </div>
-            )}
-          </div>
-        </div>
+        {/* Batch Carousel Navigation */}
+        <BatchCarousel 
+          currentBatch={current}
+          totalBatches={total}
+          onNavigate={onNavigate}
+        />
       </div>
     </div>
   );

@@ -1,14 +1,11 @@
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
 import { v4 as uuidv4 } from 'uuid';
 import { saveSessionMetadata } from '@/utils/sessionStorage';
 import type { AppState, AppActions, CheckingSession, DeviceData, ExportOptions } from '@/types/device';
 
 interface AppStore extends AppState, AppActions {}
 
-export const useAppStore = create<AppStore>()(
-  persist(
-    (set, get) => ({
+export const useAppStore = create<AppStore>((set, get) => ({
       // Initial state
       session: null,
       current_batch: 1,
@@ -238,17 +235,7 @@ export const useAppStore = create<AppStore>()(
         // requires storing blob URL mappings in a database
         throw new Error('Session loading from cloud requires additional setup. Sessions are auto-saved every minute while working.');
       }
-    }),
-    {
-      name: 'image-checker-session',
-      partialize: (state) => ({
-        session: state.session,
-        current_batch: state.current_batch,
-        selected_device_index: state.selected_device_index
-      })
-    }
-  )
-);
+    }));
 
 // Utility functions
 function convertToCSV(data: Record<string, unknown>[]): string {
