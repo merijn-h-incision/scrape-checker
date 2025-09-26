@@ -82,6 +82,7 @@ export interface SessionMetadata {
   progress_percentage: number;
   last_updated: string;
   created_at: string;
+  blob_url?: string; // URL to blob storage for resuming sessions
 }
 
 // Store state interface

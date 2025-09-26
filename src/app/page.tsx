@@ -91,10 +91,35 @@ export default function HomePage() {
   }, []);
 
   const handleResumeSession = useCallback(async (sessionMetadata: SessionMetadata) => {
-    // For now, just navigate to the session URL
-    // The session will be loaded from local storage if available
-    router.push(`/check/${sessionMetadata.session_id}`);
-  }, [router]);
+    if (!sessionMetadata.blob_url) {
+      setUploadError('Session data not available - missing blob URL');
+      return;
+    }
+
+    setIsUploading(true);
+    setUploadError(null);
+
+    try {
+      // Fetch the full session data from blob storage
+      const response = await fetch(sessionMetadata.blob_url);
+      if (!response.ok) {
+        throw new Error('Failed to load session data');
+      }
+
+      const sessionData = await response.json();
+      
+      // Load the session into the store
+      setSession(sessionData);
+      
+      // Navigate to the checking page
+      router.push(`/check/${sessionMetadata.session_id}`);
+    } catch (error) {
+      console.error('Failed to resume session:', error);
+      setUploadError('Failed to load session. Please try again.');
+    } finally {
+      setIsUploading(false);
+    }
+  }, [router, setSession]);
 
   const handleResumeBySessionId = useCallback(async () => {
     if (!resumeSessionId.trim()) {
@@ -332,10 +357,20 @@ export default function HomePage() {
                     <div className="flex items-center space-x-2 ml-4">
                       <button
                         onClick={() => handleResumeSession(session)}
-                        className="flex items-center space-x-1 px-3 py-1.5 text-xs bg-primary text-primary-foreground rounded hover:bg-primary/90 transition-colors"
+                        disabled={isUploading}
+                        className="flex items-center space-x-1 px-3 py-1.5 text-xs bg-primary text-primary-foreground rounded hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                       >
-                        <Play className="w-3 h-3" />
-                        <span>Continue</span>
+                        {isUploading ? (
+                          <>
+                            <div className="w-3 h-3 border border-primary-foreground border-t-transparent rounded-full animate-spin"></div>
+                            <span>Loading...</span>
+                          </>
+                        ) : (
+                          <>
+                            <Play className="w-3 h-3" />
+                            <span>Continue</span>
+                          </>
+                        )}
                       </button>
                       <button
                         onClick={() => handleDeleteSession(session.session_id)}
