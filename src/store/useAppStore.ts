@@ -1,6 +1,5 @@
 import { create } from 'zustand';
 import { v4 as uuidv4 } from 'uuid';
-import { saveSessionMetadata } from '@/utils/sessionStorage';
 import type { AppState, AppActions, CheckingSession, DeviceData, ExportOptions } from '@/types/device';
 
 interface AppStore extends AppState, AppActions {}
@@ -61,9 +60,6 @@ export const useAppStore = create<AppStore>((set, get) => ({
         };
 
         set({ session: updatedSession });
-
-        // Update local session metadata
-        saveSessionMetadata(updatedSession);
 
         // Note: Auto-save is handled by the useAutoSave hook every minute
         // This prevents too frequent API calls on every device update

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { del } from '@vercel/blob';
 
 export async function GET(
   request: NextRequest,
@@ -47,11 +48,16 @@ export async function DELETE(
       );
     }
 
-    // For now, we'll just return success since Vercel Blob doesn't have a delete API
-    // Sessions will remain forever as requested
+    // Delete the session file from Vercel Blob storage
+    const filename = `sessions/${sessionId}.json`;
+    
+    await del(filename, {
+      token: process.env.SCRAPE_BLOB_READ_WRITE_TOKEN,
+    });
+
     return NextResponse.json({
       success: true,
-      message: 'Session marked for deletion (stored forever as requested)',
+      message: `Session ${sessionId} deleted successfully`,
     });
 
   } catch (error) {

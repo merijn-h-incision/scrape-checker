@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Upload, FileText, AlertCircle, CheckCircle2, Clock, Play, Trash2 } from 'lucide-react';
 import { useAppStore } from '@/store/useAppStore';
 import { parseCSVFile, createSessionFromDevices } from '@/utils/csvParser';
-import { getRecentSessions, removeSessionMetadata, saveSessionMetadata } from '@/utils/sessionStorage';
+// Session management now handled via API
 import { SessionNamingModal } from '@/components/SessionNamingModal';
 import type { SessionMetadata, DeviceData } from '@/types/device';
 
@@ -15,6 +15,7 @@ export default function HomePage() {
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [uploadSuccess, setUploadSuccess] = useState<string | null>(null);
   const [recentSessions, setRecentSessions] = useState<SessionMetadata[]>([]);
+  const [isLoadingSessions, setIsLoadingSessions] = useState(true);
   const [resumeSessionId, setResumeSessionId] = useState('');
   const [showNamingModal, setShowNamingModal] = useState(false);
   const [pendingSessionData, setPendingSessionData] = useState<{
@@ -24,9 +25,26 @@ export default function HomePage() {
   const router = useRouter();
   const { setSession } = useAppStore();
 
-  // Load recent sessions on component mount
+  // Load recent sessions from blob storage on component mount
   useEffect(() => {
-    setRecentSessions(getRecentSessions());
+    const loadSessions = async () => {
+      try {
+        setIsLoadingSessions(true);
+        const response = await fetch('/api/sessions');
+        if (response.ok) {
+          const data = await response.json();
+          if (data.success) {
+            setRecentSessions(data.sessions);
+          }
+        }
+      } catch (error) {
+        console.error('Failed to load sessions:', error);
+      } finally {
+        setIsLoadingSessions(false);
+      }
+    };
+    
+    loadSessions();
   }, []);
 
   const handleFileUpload = useCallback(async (file: File) => {
@@ -89,9 +107,25 @@ export default function HomePage() {
     router.push(`/check/${resumeSessionId.trim()}`);
   }, [router, resumeSessionId]);
 
-  const handleDeleteSession = useCallback((sessionId: string) => {
-    removeSessionMetadata(sessionId);
-    setRecentSessions(getRecentSessions());
+  const handleDeleteSession = useCallback(async (sessionId: string) => {
+    try {
+      const response = await fetch(`/api/sessions/${sessionId}`, {
+        method: 'DELETE',
+      });
+      
+      if (response.ok) {
+        // Reload sessions list after deletion
+        const sessionsResponse = await fetch('/api/sessions');
+        if (sessionsResponse.ok) {
+          const data = await sessionsResponse.json();
+          if (data.success) {
+            setRecentSessions(data.sessions);
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Failed to delete session:', error);
+    }
   }, []);
 
   const handleSessionNameConfirm = useCallback((sessionName: string) => {
@@ -105,7 +139,6 @@ export default function HomePage() {
     );
     
     setSession(session);
-    saveSessionMetadata(session);
     
     // Clean up and navigate
     setShowNamingModal(false);
@@ -125,7 +158,6 @@ export default function HomePage() {
     );
     
     setSession(session);
-    saveSessionMetadata(session);
     
     // Clean up and navigate
     setShowNamingModal(false);
@@ -251,13 +283,21 @@ export default function HomePage() {
           </div>
 
           {/* Recent Sessions */}
-          {recentSessions.length > 0 && (
+          {(isLoadingSessions || recentSessions.length > 0) && (
             <div className="bg-card rounded-lg border border-border shadow-sm p-6">
               <h3 className="text-lg font-medium text-foreground mb-4">
-                Recent Sessions
+                Recent Sessions {isLoadingSessions && (
+                  <span className="text-sm text-muted-foreground">(Loading...)</span>
+                )}
               </h3>
               <div className="space-y-3">
-                {recentSessions.map((session) => (
+                {isLoadingSessions && recentSessions.length === 0 ? (
+                  <div className="flex items-center justify-center p-8 text-muted-foreground">
+                    <div className="w-5 h-5 border-2 border-primary border-t-transparent rounded-full animate-spin mr-3"></div>
+                    Loading sessions from cloud storage...
+                  </div>
+                ) : (
+                  recentSessions.map((session) => (
                   <div
                     key={session.session_id}
                     className="flex items-center justify-between p-4 bg-muted/30 rounded-lg border border-border"
@@ -305,7 +345,8 @@ export default function HomePage() {
                       </button>
                     </div>
                   </div>
-                ))}
+                  ))
+                )}
               </div>
             </div>
           )}
