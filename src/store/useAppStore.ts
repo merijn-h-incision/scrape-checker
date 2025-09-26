@@ -1,5 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import { v4 as uuidv4 } from 'uuid';
+import { saveSessionMetadata } from '@/utils/sessionStorage';
 import type { AppState, AppActions, CheckingSession, DeviceData, ExportOptions } from '@/types/device';
 
 interface AppStore extends AppState, AppActions {}
@@ -19,6 +21,7 @@ export const useAppStore = create<AppStore>()(
         const batches = Math.ceil(session.devices.length / 10);
         const updatedSession = {
           ...session,
+          session_id: session.session_id || uuidv4(),
           total_batches: batches,
           devices: session.devices.map((device, index) => ({
             ...device,
@@ -53,14 +56,20 @@ export const useAppStore = create<AppStore>()(
         ).length;
         const progress = (completedCount / updatedDevices.length) * 100;
 
-        set({
-          session: {
-            ...session,
-            devices: updatedDevices,
-            progress_percentage: progress,
-            last_updated: new Date().toISOString()
-          }
-        });
+        const updatedSession = {
+          ...session,
+          devices: updatedDevices,
+          progress_percentage: progress,
+          last_updated: new Date().toISOString()
+        };
+
+        set({ session: updatedSession });
+
+        // Update local session metadata
+        saveSessionMetadata(updatedSession);
+
+        // Note: Auto-save is handled by the useAutoSave hook every minute
+        // This prevents too frequent API calls on every device update
       },
 
       setCurrentBatch: (batchNumber: number) => {
@@ -151,10 +160,8 @@ export const useAppStore = create<AppStore>()(
             result.selected_manual_url = device.selected_manual_url;
           }
 
-          // Include notes if requested
-          if (options.include_notes && device.checker_notes) {
-            result.checker_notes = device.checker_notes;
-          }
+          // Always include checker notes (empty string if no notes)
+          result.checker_notes = device.checker_notes || '';
 
           return result;
         });
@@ -164,8 +171,7 @@ export const useAppStore = create<AppStore>()(
         downloadCSV(csvContent, `${session.filename}_checked.csv`);
       },
 
-      saveProgress: () => {
-        // Progress is automatically saved via persist middleware
+      saveProgress: async () => {
         const { session } = get();
         if (session) {
           set({
@@ -177,15 +183,60 @@ export const useAppStore = create<AppStore>()(
         }
       },
 
-      loadProgress: () => {
-        // This will be handled by the persist middleware
-        // Additional loading logic can be added here if needed
-        set({ is_loading: true });
-        
-        // Simulate loading delay
-        setTimeout(() => {
+      loadProgress: async (sessionId: string) => {
+        set({ is_loading: true, error: null });
+        try {
+          await get().loadProgressFromCloud(sessionId);
+        } catch (error) {
+          console.error('Error loading progress:', error);
+          set({ error: 'Failed to load session' });
+        } finally {
           set({ is_loading: false });
-        }, 1000);
+        }
+      },
+
+      saveProgressToCloud: async () => {
+        const { session } = get();
+        if (!session) return;
+
+        try {
+          const response = await fetch('/api/sessions', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              ...session,
+              last_updated: new Date().toISOString()
+            }),
+          });
+
+          if (!response.ok) {
+            throw new Error('Failed to save session');
+          }
+
+          const result = await response.json();
+          console.log('Session saved to cloud:', result);
+
+          // Update local session with latest timestamp and blob URL
+          set({
+            session: {
+              ...session,
+              last_updated: result.lastSaved,
+              blob_url: result.url
+            }
+          });
+
+        } catch (error) {
+          console.error('Error saving to cloud:', error);
+          throw error;
+        }
+      },
+
+      loadProgressFromCloud: async (sessionId: string) => {
+        // For now, we'll show a helpful message since server-side session loading
+        // requires storing blob URL mappings in a database
+        throw new Error('Session loading from cloud requires additional setup. Sessions are auto-saved every minute while working.');
       }
     }),
     {

@@ -2,8 +2,9 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, Download, Save } from 'lucide-react';
+import { ArrowLeft, Download, Save, Cloud } from 'lucide-react';
 import { useAppStore, useCurrentBatch } from '@/store/useAppStore';
+import { useAutoSave } from '@/hooks/useAutoSave';
 import { BatchHeader } from '@/components/BatchHeader';
 import { DeviceRow } from '@/components/DeviceRow';
 import { BatchControls } from '@/components/BatchControls';
@@ -13,7 +14,9 @@ export default function CheckPage() {
   const router = useRouter();
   const { session, current_batch, setCurrentBatch, saveProgress, exportResults } = useAppStore();
   const currentBatch = useCurrentBatch();
+  const { saveNow, isAutoSaveActive, sessionId } = useAutoSave();
   const [showExportModal, setShowExportModal] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
 
   // Redirect if no session
   useEffect(() => {
@@ -44,7 +47,7 @@ export default function CheckPage() {
           break;
         case 's':
           e.preventDefault();
-          saveProgress();
+          handleSaveAndPause();
           break;
         case 'e':
           e.preventDefault();
@@ -74,15 +77,29 @@ export default function CheckPage() {
     }
   };
 
-  const handleSaveAndNext = () => {
-    saveProgress();
-    if (current_batch < session.total_batches) {
-      setCurrentBatch(current_batch + 1);
+  const handleSaveAndNext = async () => {
+    setIsSaving(true);
+    try {
+      await saveNow();
+      if (current_batch < session.total_batches) {
+        setCurrentBatch(current_batch + 1);
+      }
+    } catch (error) {
+      console.error('Save failed:', error);
+    } finally {
+      setIsSaving(false);
     }
   };
 
-  const handleSaveAndPause = () => {
-    saveProgress();
+  const handleSaveAndPause = async () => {
+    setIsSaving(true);
+    try {
+      await saveNow();
+    } catch (error) {
+      console.error('Save failed:', error);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const hasUncheckedItems = currentBatch.devices.some(d => d.status === 'pending');
@@ -104,21 +121,33 @@ export default function CheckPage() {
               
               <div className="border-l border-border pl-4">
                 <h1 className="text-lg font-semibold text-foreground">
-                  {session.filename}
+                  {session.session_name}
                 </h1>
                 <p className="text-sm text-muted-foreground">
                   Batch {current_batch} of {session.total_batches} • {session.total_rows} total devices
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Session ID: {session.session_id}
                 </p>
               </div>
             </div>
 
             <div className="flex items-center space-x-2">
+              {/* Auto-save status indicator */}
+              {isAutoSaveActive && (
+                <div className="flex items-center space-x-1 text-xs text-muted-foreground">
+                  <Cloud className="w-3 h-3" />
+                  <span>Auto-save active</span>
+                </div>
+              )}
+              
               <button
                 onClick={handleSaveAndPause}
-                className="flex items-center space-x-2 px-3 py-2 text-sm border border-border rounded-lg hover:bg-accent transition-colors"
+                disabled={isSaving}
+                className="flex items-center space-x-2 px-3 py-2 text-sm border border-border rounded-lg hover:bg-accent transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                <Save className="w-4 h-4" />
-                <span>Save Progress</span>
+                <Save className={`w-4 h-4 ${isSaving ? 'animate-pulse' : ''}`} />
+                <span>{isSaving ? 'Saving...' : 'Save Progress'}</span>
               </button>
               
               <button
@@ -173,28 +202,6 @@ export default function CheckPage() {
         </div>
       </main>
 
-      {/* Keyboard Shortcuts Help */}
-      <div className="fixed bottom-4 right-4 bg-card border border-border rounded-lg p-4 shadow-lg max-w-xs">
-        <h4 className="text-sm font-medium text-foreground mb-2">Keyboard Shortcuts</h4>
-        <div className="space-y-1 text-xs text-muted-foreground">
-          <div className="flex justify-between">
-            <span>Previous batch:</span>
-            <code className="bg-muted px-1 rounded">← or P</code>
-          </div>
-          <div className="flex justify-between">
-            <span>Next batch:</span>
-            <code className="bg-muted px-1 rounded">→ or N</code>
-          </div>
-          <div className="flex justify-between">
-            <span>Save progress:</span>
-            <code className="bg-muted px-1 rounded">S</code>
-          </div>
-          <div className="flex justify-between">
-            <span>Export:</span>
-            <code className="bg-muted px-1 rounded">E</code>
-          </div>
-        </div>
-      </div>
 
       {/* Export Modal */}
       {showExportModal && (

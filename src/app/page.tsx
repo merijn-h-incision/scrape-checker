@@ -1,18 +1,33 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Upload, FileText, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { Upload, FileText, AlertCircle, CheckCircle2, Clock, Play, Trash2 } from 'lucide-react';
 import { useAppStore } from '@/store/useAppStore';
 import { parseCSVFile, createSessionFromDevices } from '@/utils/csvParser';
+import { getRecentSessions, removeSessionMetadata, saveSessionMetadata } from '@/utils/sessionStorage';
+import { SessionNamingModal } from '@/components/SessionNamingModal';
+import type { SessionMetadata, DeviceData } from '@/types/device';
 
 export default function HomePage() {
   const [isDragOver, setIsDragOver] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [uploadSuccess, setUploadSuccess] = useState<string | null>(null);
+  const [recentSessions, setRecentSessions] = useState<SessionMetadata[]>([]);
+  const [resumeSessionId, setResumeSessionId] = useState('');
+  const [showNamingModal, setShowNamingModal] = useState(false);
+  const [pendingSessionData, setPendingSessionData] = useState<{
+    devices: DeviceData[];
+    filename: string;
+  } | null>(null);
   const router = useRouter();
   const { setSession } = useAppStore();
+
+  // Load recent sessions on component mount
+  useEffect(() => {
+    setRecentSessions(getRecentSessions());
+  }, []);
 
   const handleFileUpload = useCallback(async (file: File) => {
     if (!file.name.toLowerCase().endsWith('.csv')) {
@@ -37,15 +52,14 @@ export default function HomePage() {
         return;
       }
 
-      const session = createSessionFromDevices(result.data, file.name);
-      setSession(session);
+      // Store the parsed data and show naming modal
+      setPendingSessionData({
+        devices: result.data,
+        filename: file.name
+      });
       
       setUploadSuccess(`Successfully loaded ${result.data.length} devices!`);
-      
-      // Navigate to checking interface after a short delay
-      setTimeout(() => {
-        router.push(`/check/${session.id}`);
-      }, 1500);
+      setShowNamingModal(true);
 
     } catch (error) {
       setUploadError(
@@ -56,7 +70,70 @@ export default function HomePage() {
     } finally {
       setIsUploading(false);
     }
-  }, [setSession, router]);
+  }, []);
+
+  const handleResumeSession = useCallback(async (sessionMetadata: SessionMetadata) => {
+    // For now, just navigate to the session URL
+    // The session will be loaded from local storage if available
+    router.push(`/check/${sessionMetadata.session_id}`);
+  }, [router]);
+
+  const handleResumeBySessionId = useCallback(async () => {
+    if (!resumeSessionId.trim()) {
+      setUploadError('Please enter a session ID');
+      return;
+    }
+
+    // For now, just navigate to the session URL
+    // The session will be loaded from local storage if available
+    router.push(`/check/${resumeSessionId.trim()}`);
+  }, [router, resumeSessionId]);
+
+  const handleDeleteSession = useCallback((sessionId: string) => {
+    removeSessionMetadata(sessionId);
+    setRecentSessions(getRecentSessions());
+  }, []);
+
+  const handleSessionNameConfirm = useCallback((sessionName: string) => {
+    if (!pendingSessionData) return;
+
+    // Create session with the chosen name
+    const session = createSessionFromDevices(
+      pendingSessionData.devices, 
+      pendingSessionData.filename, 
+      sessionName
+    );
+    
+    setSession(session);
+    saveSessionMetadata(session);
+    
+    // Clean up and navigate
+    setShowNamingModal(false);
+    setPendingSessionData(null);
+    setUploadSuccess(null);
+    
+    router.push(`/check/${session.session_id}`);
+  }, [pendingSessionData, setSession, router]);
+
+  const handleSessionNameSkip = useCallback(() => {
+    if (!pendingSessionData) return;
+
+    // Create session with default name (filename)
+    const session = createSessionFromDevices(
+      pendingSessionData.devices, 
+      pendingSessionData.filename
+    );
+    
+    setSession(session);
+    saveSessionMetadata(session);
+    
+    // Clean up and navigate
+    setShowNamingModal(false);
+    setPendingSessionData(null);
+    setUploadSuccess(null);
+    
+    router.push(`/check/${session.session_id}`);
+  }, [pendingSessionData, setSession, router]);
 
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -111,6 +188,7 @@ export default function HomePage() {
                   to start the image checking process.
                 </p>
               </div>
+
 
               {/* File Drop Zone */}
               <div
@@ -172,6 +250,92 @@ export default function HomePage() {
             </div>
           </div>
 
+          {/* Recent Sessions */}
+          {recentSessions.length > 0 && (
+            <div className="bg-card rounded-lg border border-border shadow-sm p-6">
+              <h3 className="text-lg font-medium text-foreground mb-4">
+                Recent Sessions
+              </h3>
+              <div className="space-y-3">
+                {recentSessions.map((session) => (
+                  <div
+                    key={session.session_id}
+                    className="flex items-center justify-between p-4 bg-muted/30 rounded-lg border border-border"
+                  >
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center space-x-3">
+                        <div>
+                          <h4 className="text-sm font-medium text-foreground truncate">
+                            {session.session_name}
+                          </h4>
+                          <div className="flex items-center space-x-4 mt-1">
+                            <p className="text-xs text-muted-foreground">
+                              {session.total_rows} devices
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              {Math.round(session.progress_percentage)}% complete
+                            </p>
+                            <p className="text-xs text-muted-foreground flex items-center">
+                              <Clock className="w-3 h-3 mr-1" />
+                              {new Date(session.last_updated).toLocaleDateString()}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="mt-2 bg-muted rounded-full h-1.5">
+                        <div 
+                          className="bg-primary h-1.5 rounded-full transition-all"
+                          style={{ width: `${session.progress_percentage}%` }}
+                        />
+                      </div>
+                    </div>
+                    <div className="flex items-center space-x-2 ml-4">
+                      <button
+                        onClick={() => handleResumeSession(session)}
+                        className="flex items-center space-x-1 px-3 py-1.5 text-xs bg-primary text-primary-foreground rounded hover:bg-primary/90 transition-colors"
+                      >
+                        <Play className="w-3 h-3" />
+                        <span>Continue</span>
+                      </button>
+                      <button
+                        onClick={() => handleDeleteSession(session.session_id)}
+                        className="p-1.5 text-muted-foreground hover:text-destructive transition-colors"
+                      >
+                        <Trash2 className="w-3 h-3" />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Resume by Session ID */}
+          <div className="bg-muted/30 rounded-lg p-6">
+            <h3 className="text-lg font-medium text-foreground mb-4">
+              Resume Session by ID
+            </h3>
+            <div className="flex space-x-3">
+              <input
+                type="text"
+                value={resumeSessionId}
+                onChange={(e) => setResumeSessionId(e.target.value)}
+                placeholder="Enter session ID (e.g., session_1234567890_abc123def)"
+                className="flex-1 px-3 py-2 border border-border rounded-lg bg-background text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent"
+              />
+              <button
+                onClick={handleResumeBySessionId}
+                disabled={!resumeSessionId.trim()}
+                className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Resume
+              </button>
+            </div>
+            <p className="text-xs text-muted-foreground mt-2">
+              Enter a session ID to resume work from any device or shared session
+            </p>
+          </div>
+
           {/* Instructions */}
           <div className="bg-muted/30 rounded-lg p-6">
             <h3 className="text-lg font-medium text-foreground mb-4">
@@ -202,6 +366,18 @@ export default function HomePage() {
           </p>
         </div>
       </footer>
+
+      {/* Session Naming Modal */}
+      {pendingSessionData && (
+        <SessionNamingModal
+          isOpen={showNamingModal}
+          filename={pendingSessionData.filename}
+          deviceCount={pendingSessionData.devices.length}
+          defaultName={pendingSessionData.filename.replace('.csv', '')}
+          onConfirm={handleSessionNameConfirm}
+          onSkip={handleSessionNameSkip}
+        />
+      )}
     </div>
   );
 }

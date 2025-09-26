@@ -37,6 +37,8 @@ export type DeviceStatus = 'pending' | 'approved' | 'custom_selected' | 'skipped
 
 export interface CheckingSession {
   id: string;
+  session_id: string;
+  session_name: string; // User-friendly session name
   filename: string;
   total_rows: number;
   total_batches: number;
@@ -46,6 +48,7 @@ export interface CheckingSession {
   devices: DeviceData[];
   created_at: string;
   last_updated: string;
+  blob_url?: string; // URL returned from Vercel Blob
 }
 
 export interface BatchInfo {
@@ -71,6 +74,16 @@ export interface ExportOptions {
   include_notes: boolean;
 }
 
+export interface SessionMetadata {
+  session_id: string;
+  session_name: string;
+  filename: string;
+  total_rows: number;
+  progress_percentage: number;
+  last_updated: string;
+  created_at: string;
+}
+
 // Store state interface
 export interface AppState {
   session: CheckingSession | null;
@@ -90,8 +103,10 @@ export interface AppActions {
   setLoading: (loading: boolean) => void;
   setError: (error: string | null) => void;
   exportResults: (options: ExportOptions) => void;
-  saveProgress: () => void;
-  loadProgress: (sessionId: string) => void;
+  saveProgress: () => Promise<void>;
+  loadProgress: (sessionId: string) => Promise<void>;
+  saveProgressToCloud: () => Promise<void>;
+  loadProgressFromCloud: (sessionId: string) => Promise<void>;
 }
 
 // CSV parsing types

@@ -63,13 +63,20 @@ function validateAndTransformDevices(rawData: Record<string, unknown>[]): Device
   });
 }
 
-export function createSessionFromDevices(devices: DeviceData[], filename: string): CheckingSession {
+export function createSessionFromDevices(
+  devices: DeviceData[], 
+  filename: string, 
+  sessionName?: string
+): CheckingSession {
   const sessionId = generateSessionId();
   const totalBatches = Math.ceil(devices.length / 10);
+  const cleanFilename = filename.replace('.csv', '');
   
   return {
     id: sessionId,
-    filename: filename.replace('.csv', ''),
+    session_id: sessionId,
+    session_name: sessionName || cleanFilename,
+    filename: cleanFilename,
     total_rows: devices.length,
     total_batches: totalBatches,
     current_batch: 1,
