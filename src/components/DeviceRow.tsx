@@ -43,7 +43,16 @@ export function DeviceRow({ device, deviceIndex, rowNumber }: DeviceRowProps) {
   };
 
   const handleStatusChange = (status: DeviceData['status']) => {
-    updateDevice(deviceIndex, { status });
+    // When rejecting a device, clear the selected image URL
+    if (status === 'rejected') {
+      setSelectedImageUrl('');
+      updateDevice(deviceIndex, { 
+        status,
+        selected_image_url: ''
+      });
+    } else {
+      updateDevice(deviceIndex, { status });
+    }
   };
 
   const handleNotesChange = (newNotes: string) => {

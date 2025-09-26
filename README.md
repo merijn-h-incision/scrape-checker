@@ -1,36 +1,142 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Medical Device Image Checker
 
-## Getting Started
+A professional web application designed to streamline the review and validation of medical device images and documentation. This tool helps medical professionals and regulatory teams efficiently process large datasets of medical devices by providing an intuitive interface for image selection, categorization, and quality control.
 
-First, run the development server:
+## 🎯 Purpose & Value
 
+The Medical Device Image Checker addresses critical challenges in medical device data management:
+
+- **Quality Assurance**: Ensures only high-quality, relevant images are selected for medical device documentation
+- **Regulatory Compliance**: Helps maintain consistent standards for device imagery used in regulatory submissions
+- **Efficiency**: Processes hundreds of devices in organized batches, significantly reducing manual review time
+- **Traceability**: Maintains detailed records of reviewer decisions and notes for audit purposes
+- **Standardization**: Provides consistent categorization using predefined material categories and subcategories
+
+## ✨ Key Features
+
+### 📋 Batch Processing
+- Organizes devices into manageable batches of 10 items
+- Progress tracking across all batches
+- Quick navigation between batches
+- Visual progress indicators
+
+### 🖼️ Image Management
+- Multiple image options per device with thumbnail previews
+- Primary image identification and custom selection
+- Image loading with fallback handling
+- Full-size image preview capabilities
+
+### 📄 Documentation Handling
+- Manual and IFU (Instructions for Use) document links
+- Multiple manual options per device
+- Direct links to manufacturer documentation
+
+### 🏷️ Material Classification
+- Comprehensive category system:
+  - **SURGICAL INSTRUMENTS**
+  - **IMPLANTS**
+  - **FLUIDS & MEDICINES**
+  - **DISPOSABLES** (with subcategories: Other Disposables, Draping, Prep, Staplers, Wound Care)
+  - **OR INVENTORY** (with subcategories: Positioning Materials, Carts Caddys Lockers, Accessories, Other)
+  - **SUTURES**
+
+### ✅ Review Status Management
+- **Approved**: Device and images meet quality standards
+- **Custom Selected**: Alternative image chosen by reviewer
+- **Rejected**: Device flagged for quality issues (included in export)
+- **Skipped**: Device bypassed for review
+
+### 📊 Export & Reporting
+- CSV export with all device data and reviewer decisions
+- Configurable export options (images, manuals, notes)
+- Material category and subcategory columns
+- Complete audit trail of review process
+
+## 🚀 Getting Started
+
+### Prerequisites
+- Node.js 18+ 
+- pnpm (recommended) or npm
+
+### Installation
+
+1. Clone the repository:
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+git clone <repository-url>
+cd image-checker
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+2. Install dependencies:
+```bash
+pnpm install
+```
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+3. Start the development server:
+```bash
+pnpm dev
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+4. Open [http://localhost:3000](http://localhost:3000) in your browser
 
-## Learn More
+### Usage
 
-To learn more about Next.js, take a look at the following resources:
+1. **Upload CSV**: Start by uploading a CSV file containing device data with the following columns:
+   - `product_name`, `manufacturer`, `manuf_number`, `gmdn_terms`, `device_id`
+   - `image_url`, `image_urls` (pipe-separated multiple URLs)
+   - `manual_url`, `manual_urls` (pipe-separated multiple URLs)
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+2. **Review Devices**: Navigate through batches and review each device:
+   - Select the best image from available options
+   - Choose appropriate material category and subcategory
+   - Set review status (Approve/Reject/Skip)
+   - Add optional notes
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+3. **Export Results**: Download the completed review as a CSV file with all selections and categorizations
 
-## Deploy on Vercel
+## 🛠️ Technical Stack
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+- **Framework**: Next.js 15 with App Router
+- **Language**: TypeScript
+- **Styling**: Tailwind CSS
+- **State Management**: Zustand with persistence
+- **CSV Processing**: PapaParse
+- **Icons**: Lucide React
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## 📁 Project Structure
+
+```
+src/
+├── app/                 # Next.js app router pages
+├── components/          # Reusable UI components
+│   ├── BatchHeader.tsx  # Batch navigation and progress
+│   ├── DeviceRow.tsx    # Individual device review interface
+│   ├── ExportModal.tsx  # Export configuration dialog
+│   └── ImageWithFallback.tsx # Image loading component
+├── store/              # Zustand state management
+├── types/              # TypeScript type definitions
+└── utils/              # Utility functions and constants
+    ├── categories.ts   # Material category definitions
+    └── csvParser.ts    # CSV processing utilities
+```
+
+## 🔧 Configuration
+
+The application uses local storage to persist review sessions, allowing users to:
+- Resume work after browser refresh
+- Maintain progress across sessions
+- Recover from unexpected interruptions
+
+## 📈 Performance Features
+
+- **Lazy Loading**: Images load on-demand with loading states
+- **Batch Processing**: Efficient handling of large datasets
+- **Local Persistence**: Automatic progress saving
+- **Responsive Design**: Works on desktop and tablet devices
+
+## 🤝 Contributing
+
+This application is designed for medical device professionals and regulatory teams. Contributions should maintain the high standards required for medical device documentation workflows.
+
+## 📄 License
+
+[Add your license information here]

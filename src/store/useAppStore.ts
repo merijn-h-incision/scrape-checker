@@ -139,9 +139,9 @@ export const useAppStore = create<AppStore>()(
           // Handle image URLs based on options
           if (options.include_all_images) {
             result.image_urls = device.image_urls;
-            result.selected_image_url = device.selected_image_url;
+            result.selected_image_url = device.status === 'rejected' ? '' : device.selected_image_url;
           } else {
-            result.image_url = device.selected_image_url || device.image_url;
+            result.image_url = device.status === 'rejected' ? '' : (device.selected_image_url || device.image_url);
           }
 
           // Include manuals if requested
