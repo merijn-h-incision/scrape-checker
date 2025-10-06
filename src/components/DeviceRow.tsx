@@ -29,9 +29,11 @@ export function DeviceRow({ device, deviceIndex, rowNumber }: DeviceRowProps) {
 
   const handleImageSelect = (url: string) => {
     setSelectedImageUrl(url);
+    // Automatically approve when an image is selected (unless already rejected)
+    const newStatus = device.status === 'rejected' ? 'rejected' : 'approved';
     updateDevice(deviceIndex, { 
       selected_image_url: url,
-      status: url === device.image_url ? 'approved' : 'custom_selected'
+      status: newStatus
     });
   };
 

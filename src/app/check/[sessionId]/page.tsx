@@ -25,6 +25,11 @@ export default function CheckPage() {
     }
   }, [session, router]);
 
+  // Auto-scroll to top when batch changes
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, [current_batch]);
+
   // Save functions
   const handleSaveAndPause = async () => {
     setIsSaving(true);
