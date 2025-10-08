@@ -26,6 +26,8 @@ export const useAppStore = create<AppStore>((set, get) => ({
             status: device.status || 'pending',
             selected_image_url: device.selected_image_url || device.image_url,
             selected_manual_url: device.selected_manual_url || device.manual_url,
+            custom_image_url: device.custom_image_url || '',
+            custom_type: device.custom_type || '',
             material_category: device.material_category || '',
             material_subcategory: device.material_subcategory || ''
           }))
@@ -130,6 +132,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
             manufacturer: device.manufacturer,
             manuf_number: device.manuf_number,
             gmdn_terms: device.gmdn_terms,
+            custom_type: device.custom_type || '',
             device_id: device.device_id,
             search_query: device.search_query,
             official_product_name: device.official_product_name,
@@ -142,8 +145,14 @@ export const useAppStore = create<AppStore>((set, get) => ({
           if (options.include_all_images) {
             result.image_urls = device.image_urls;
             result.selected_image_url = device.status === 'rejected' ? '' : device.selected_image_url;
+            result.custom_image_url = device.custom_image_url || '';
           } else {
-            result.image_url = device.status === 'rejected' ? '' : (device.selected_image_url || device.image_url);
+            // Use custom_image_url if it's the selected one, otherwise use selected_image_url
+            const finalImageUrl = device.status === 'rejected' ? '' : (device.selected_image_url || device.image_url);
+            result.image_url = finalImageUrl;
+            if (device.custom_image_url) {
+              result.custom_image_url = device.custom_image_url;
+            }
           }
 
           // Include manuals if requested

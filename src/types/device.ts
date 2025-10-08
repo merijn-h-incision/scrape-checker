@@ -24,6 +24,8 @@ export interface DeviceData {
   status?: DeviceStatus;
   selected_image_url?: string;
   selected_manual_url?: string;
+  custom_image_url?: string;
+  custom_type?: string;
   checker_notes?: string;
   batch_id?: number;
   row_index?: number;

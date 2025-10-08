@@ -22,10 +22,20 @@ export function DeviceRow({ device, deviceIndex, rowNumber }: DeviceRowProps) {
   const [notes, setNotes] = useState(device.checker_notes || '');
   const [materialCategory, setMaterialCategory] = useState(device.material_category || '');
   const [materialSubcategory, setMaterialSubcategory] = useState(device.material_subcategory || '');
+  const [customType, setCustomType] = useState(device.custom_type || '');
+  const [customImageUrl, setCustomImageUrl] = useState(device.custom_image_url || '');
+  const [customImageInput, setCustomImageInput] = useState('');
+  const [isValidatingImage, setIsValidatingImage] = useState(false);
+  const [imageValidationError, setImageValidationError] = useState('');
   
   const imageUrls = getImageUrls(device);
   const manualUrls = getManualUrls(device);
   const deviceTitle = formatDeviceTitle(device);
+  
+  // Include custom image URL in the list if it exists
+  const allImageUrls = customImageUrl && !imageUrls.includes(customImageUrl) 
+    ? [...imageUrls, customImageUrl] 
+    : imageUrls;
 
   const handleImageSelect = (url: string) => {
     setSelectedImageUrl(url);
@@ -78,6 +88,52 @@ export function DeviceRow({ device, deviceIndex, rowNumber }: DeviceRowProps) {
     updateDevice(deviceIndex, { material_subcategory: subcategory });
   };
 
+  const handleCustomTypeChange = (newType: string) => {
+    setCustomType(newType);
+    updateDevice(deviceIndex, { custom_type: newType });
+  };
+
+  const handleAddCustomImage = async () => {
+    const url = customImageInput.trim();
+    
+    // Basic URL validation
+    if (!url) {
+      setImageValidationError('Please enter a URL');
+      return;
+    }
+    
+    if (!url.startsWith('http://') && !url.startsWith('https://')) {
+      setImageValidationError('URL must start with http:// or https://');
+      return;
+    }
+
+    setIsValidatingImage(true);
+    setImageValidationError('');
+
+    // Try to load the image to validate it
+    const img = new Image();
+    
+    img.onload = () => {
+      setCustomImageUrl(url);
+      setSelectedImageUrl(url);
+      updateDevice(deviceIndex, { 
+        custom_image_url: url,
+        selected_image_url: url,
+        status: device.status === 'rejected' ? 'rejected' : 'approved'
+      });
+      setCustomImageInput('');
+      setIsValidatingImage(false);
+      setImageValidationError('');
+    };
+    
+    img.onerror = () => {
+      setImageValidationError('Unable to load image from this URL. Please check the URL and try again.');
+      setIsValidatingImage(false);
+    };
+    
+    img.src = url;
+  };
+
   const statusColor = getStatusColor(device.status);
   const statusLabel = getStatusLabel(device.status);
 
@@ -107,11 +163,6 @@ export function DeviceRow({ device, deviceIndex, rowNumber }: DeviceRowProps) {
               <span>
                 <strong>Model:</strong> {device.manuf_number}
               </span>
-              {device.gmdn_terms && (
-                <span>
-                  <strong>Type:</strong> {device.gmdn_terms}
-                </span>
-              )}
             </div>
           </div>
           
@@ -162,6 +213,29 @@ export function DeviceRow({ device, deviceIndex, rowNumber }: DeviceRowProps) {
         </div>
       </div>
 
+      {/* Device Type Section */}
+      <div className="px-6 py-4 border-b border-border bg-muted/10">
+        <div className="space-y-2">
+          <label htmlFor={`type-${deviceIndex}`} className="block text-sm font-medium text-foreground">
+            Device Type
+          </label>
+          <input
+            id={`type-${deviceIndex}`}
+            type="text"
+            value={customType}
+            onChange={(e) => handleCustomTypeChange(e.target.value)}
+            placeholder="Enter custom device type..."
+            className="w-full px-3 py-2 border border-border rounded-lg bg-background text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent"
+          />
+          {device.gmdn_terms && (
+            <div className="flex items-start space-x-2 text-xs text-muted-foreground">
+              <span className="font-medium">Original:</span>
+              <span className="flex-1">{device.gmdn_terms}</span>
+            </div>
+          )}
+        </div>
+      </div>
+
       {/* Image Selection Area */}
       <div className="p-6">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -200,28 +274,75 @@ export function DeviceRow({ device, deviceIndex, rowNumber }: DeviceRowProps) {
           {/* Alternative Images Grid */}
           <div className="space-y-4">
             <h4 className="text-sm font-medium text-foreground">
-              Alternative Images ({imageUrls.length})
+              Alternative Images ({allImageUrls.length})
             </h4>
             
-            {imageUrls.length > 0 ? (
+            {allImageUrls.length > 0 ? (
               <div className="grid grid-cols-3 gap-2 max-h-64 overflow-y-auto">
-                {imageUrls.map((url, index) => (
-                  <ImageThumbnail
-                    key={index}
-                    src={url}
-                    alt={`${deviceTitle} - Image ${index + 1}`}
-                    isSelected={url === selectedImageUrl}
-                    isPrimary={url === device.image_url}
-                    onClick={() => handleImageSelect(url)}
-                    className="h-20 w-full"
-                  />
-                ))}
+                {allImageUrls.map((url, index) => {
+                  const isCustomImage = url === customImageUrl;
+                  return (
+                    <div key={index} className="relative">
+                      <ImageThumbnail
+                        src={url}
+                        alt={`${deviceTitle} - Image ${index + 1}`}
+                        isSelected={url === selectedImageUrl}
+                        isPrimary={url === device.image_url}
+                        onClick={() => handleImageSelect(url)}
+                        className="h-20 w-full"
+                      />
+                      {isCustomImage && (
+                        <div className="absolute top-1 right-1 bg-purple-600 text-white px-1.5 py-0.5 rounded text-xs font-medium">
+                          Custom
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             ) : (
               <div className="text-center py-8 text-muted-foreground">
                 <p className="text-sm">No alternative images available</p>
               </div>
             )}
+
+            {/* Add Custom Image URL */}
+            <div className="pt-4 border-t border-border space-y-3">
+              <div>
+                <h5 className="text-xs font-medium text-muted-foreground">Add Custom Image URL</h5>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Tip: Right-click on any image and select "Copy Image Address" to get the direct image URL
+                </p>
+              </div>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={customImageInput}
+                  onChange={(e) => setCustomImageInput(e.target.value)}
+                  onKeyPress={(e) => {
+                    if (e.key === 'Enter') {
+                      handleAddCustomImage();
+                    }
+                  }}
+                  placeholder="https://example.com/image.jpg"
+                  className="flex-1 px-3 py-2 text-sm border border-border rounded-lg bg-background text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent"
+                  disabled={isValidatingImage}
+                />
+                <button
+                  onClick={handleAddCustomImage}
+                  disabled={isValidatingImage || !customImageInput.trim()}
+                  className="px-4 py-2 text-sm bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isValidatingImage ? 'Validating...' : 'Add Image'}
+                </button>
+              </div>
+              {imageValidationError && (
+                <p className="text-xs text-destructive">{imageValidationError}</p>
+              )}
+              {customImageUrl && (
+                <p className="text-xs text-success">✓ Custom image added and selected</p>
+              )}
+            </div>
           </div>
         </div>
 

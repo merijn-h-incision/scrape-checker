@@ -6,7 +6,8 @@ export const MATERIAL_CATEGORIES = [
   'FLUIDS & MEDICINES',
   'DISPOSABLES',
   'OR INVENTORY',
-  'SUTURES'
+  'SUTURES',
+  'DEVICE'
 ] as const;
 
 export const MATERIAL_SUBCATEGORIES = {
