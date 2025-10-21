@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft, Download, Save, Cloud } from 'lucide-react';
 import { useAppStore, useCurrentBatch } from '@/store/useAppStore';
@@ -31,7 +31,7 @@ export default function CheckPage() {
   }, [current_batch]);
 
   // Save functions
-  const handleSaveAndPause = async () => {
+  const handleSaveAndPause = useCallback(async () => {
     setIsSaving(true);
     try {
       await saveNow();
@@ -40,7 +40,7 @@ export default function CheckPage() {
     } finally {
       setIsSaving(false);
     }
-  };
+  }, [saveNow]);
 
   // Keyboard navigation
   useEffect(() => {

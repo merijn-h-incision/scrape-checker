@@ -311,7 +311,7 @@ export function DeviceRow({ device, deviceIndex, rowNumber }: DeviceRowProps) {
               <div>
                 <h5 className="text-xs font-medium text-muted-foreground">Add Custom Image URL</h5>
                 <p className="text-xs text-muted-foreground mt-1">
-                  Tip: Right-click on any image and select "Copy Image Address" to get the direct image URL
+                  Tip: Right-click on any image and select &quot;Copy Image Address&quot; to get the direct image URL
                 </p>
               </div>
               <div className="flex gap-2">
