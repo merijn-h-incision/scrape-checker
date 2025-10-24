@@ -12,6 +12,17 @@ The Medical Device Image Checker addresses critical challenges in medical device
 - **Traceability**: Maintains detailed records of reviewer decisions and notes for audit purposes
 - **Standardization**: Provides consistent categorization using predefined material categories and subcategories
 
+## 🔐 Security
+
+This application requires Google OAuth authentication to ensure only authorized users can access medical device data:
+
+- **Organization-Only Access**: Restrict access to specific email domains
+- **Protected Routes**: All application routes require authentication
+- **Session Management**: Secure session handling with NextAuth.js
+- **Automatic Redirects**: Unauthenticated users are redirected to login
+
+See [AUTH_SETUP.md](./AUTH_SETUP.md) for complete setup instructions.
+
 ## ✨ Key Features
 
 ### 📋 Batch Processing
@@ -57,6 +68,7 @@ The Medical Device Image Checker addresses critical challenges in medical device
 ### Prerequisites
 - Node.js 18+ 
 - pnpm (recommended) or npm
+- Google OAuth credentials (for authentication)
 
 ### Installation
 
@@ -71,12 +83,18 @@ cd image-checker
 pnpm install
 ```
 
-3. Start the development server:
+3. **Set up authentication** (see [AUTH_SETUP.md](./AUTH_SETUP.md) for detailed instructions):
+   - Create Google OAuth credentials
+   - Copy `.env.local.example` to `.env.local`
+   - Add your OAuth credentials and generate an AUTH_SECRET
+   - Configure allowed domains in `src/auth.ts`
+
+4. Start the development server:
 ```bash
 pnpm dev
 ```
 
-4. Open [http://localhost:3000](http://localhost:3000) in your browser
+5. Open [http://localhost:3000](http://localhost:3000) in your browser and sign in with your Google account
 
 ### Usage
 

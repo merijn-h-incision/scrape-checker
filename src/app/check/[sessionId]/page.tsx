@@ -9,6 +9,7 @@ import { BatchHeader } from '@/components/BatchHeader';
 import { DeviceRow } from '@/components/DeviceRow';
 import { BatchControls } from '@/components/BatchControls';
 import { ExportModal } from '@/components/ExportModal';
+import { AuthButton } from '@/components/AuthButton';
 
 export default function CheckPage() {
   const router = useRouter();
@@ -138,7 +139,7 @@ export default function CheckPage() {
               </div>
             </div>
 
-            <div className="flex items-center space-x-2">
+            <div className="flex items-center space-x-3">
               {/* Auto-save status indicator */}
               {isAutoSaveActive && (
                 <div className="flex items-center space-x-1 text-xs text-muted-foreground">
@@ -163,6 +164,10 @@ export default function CheckPage() {
                 <Download className="w-4 h-4" />
                 <span>Export</span>
               </button>
+
+              <div className="border-l border-border pl-3">
+                <AuthButton />
+              </div>
             </div>
           </div>
         </div>

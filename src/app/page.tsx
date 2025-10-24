@@ -2,14 +2,17 @@
 
 import { useState, useCallback, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Upload, FileText, AlertCircle, CheckCircle2, Clock, Play, Trash2 } from 'lucide-react';
+import { useSession } from 'next-auth/react';
+import { Upload, FileText, AlertCircle, CheckCircle2, Clock, Play, Trash2, ShieldAlert } from 'lucide-react';
 import { useAppStore } from '@/store/useAppStore';
 import { parseCSVFile, createSessionFromDevices } from '@/utils/csvParser';
 // Session management now handled via API
 import { SessionNamingModal } from '@/components/SessionNamingModal';
+import { AuthButton } from '@/components/AuthButton';
 import type { SessionMetadata, DeviceData } from '@/types/device';
 
 export default function HomePage() {
+  const { data: session, status } = useSession();
   const [isDragOver, setIsDragOver] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
@@ -209,23 +212,71 @@ export default function HomePage() {
     }
   }, [handleFileUpload]);
 
+  // Show loading state while checking authentication
+  if (status === "loading") {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center space-y-4">
+          <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto"></div>
+          <p className="text-muted-foreground">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Show login prompt if not authenticated
+  if (!session) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="max-w-md w-full mx-4">
+          <div className="bg-card rounded-lg border border-border shadow-lg p-8 text-center space-y-6">
+            <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto">
+              <ShieldAlert className="w-8 h-8 text-primary" />
+            </div>
+            <div className="space-y-2">
+              <h1 className="text-2xl font-semibold text-foreground">
+                Authentication Required
+              </h1>
+              <p className="text-muted-foreground">
+                This application is restricted to authorized users only.
+                Please sign in with your organization&apos;s Google account to continue.
+              </p>
+            </div>
+            <div className="flex justify-center">
+              <AuthButton />
+            </div>
+            {uploadError && (
+              <div className="flex items-center justify-center space-x-2 p-3 bg-destructive/10 border border-destructive/20 rounded-lg text-sm">
+                <AlertCircle className="w-4 h-4 text-destructive" />
+                <p className="text-destructive">Access denied: {uploadError}</p>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
       <header className="border-b border-border bg-card shadow-sm">
         <div className="max-w-4xl mx-auto px-6 py-4">
-          <div className="flex items-center space-x-3">
-            <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
-              <FileText className="w-5 h-5 text-primary-foreground" />
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-3">
+              <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
+                <FileText className="w-5 h-5 text-primary-foreground" />
+              </div>
+              <div>
+                <h1 className="text-xl font-semibold text-foreground">
+                  Medical Device Image Checker
+                </h1>
+                <p className="text-sm text-muted-foreground">
+                  Upload your device results CSV to start checking images
+                </p>
+              </div>
             </div>
-            <div>
-              <h1 className="text-xl font-semibold text-foreground">
-                Medical Device Image Checker
-              </h1>
-              <p className="text-sm text-muted-foreground">
-                Upload your device results CSV to start checking images
-              </p>
-            </div>
+            <AuthButton />
           </div>
         </div>
       </header>
