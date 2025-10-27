@@ -199,26 +199,36 @@ export const useAppStore = create<AppStore>((set, get) => ({
 
       saveProgressToCloud: async () => {
         const { session } = get();
-        if (!session) return;
+        if (!session) {
+          console.warn('saveProgressToCloud: No session available');
+          return;
+        }
+
+        const saveTimestamp = new Date().toISOString();
+        console.log(`[SAVE START] Session ${session.session_id} - ${session.devices.length} devices, progress: ${session.progress_percentage.toFixed(1)}%`);
 
         try {
+          const sessionToSave = {
+            ...session,
+            last_updated: saveTimestamp
+          };
+
           const response = await fetch('/api/sessions', {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
             },
-            body: JSON.stringify({
-              ...session,
-              last_updated: new Date().toISOString()
-            }),
+            body: JSON.stringify(sessionToSave),
           });
 
           if (!response.ok) {
-            throw new Error('Failed to save session');
+            const errorText = await response.text();
+            throw new Error(`Server returned ${response.status}: ${errorText}`);
           }
 
           const result = await response.json();
-          console.log('Session saved to cloud:', result);
+          console.log(`[SAVE SUCCESS] Session ${session.session_id} saved to ${result.url}`);
+          console.log(`[SAVE SUCCESS] Timestamp: ${result.lastSaved}`);
 
           // Update local session with latest timestamp and blob URL
           set({
@@ -230,7 +240,9 @@ export const useAppStore = create<AppStore>((set, get) => ({
           });
 
         } catch (error) {
-          console.error('Error saving to cloud:', error);
+          console.error('[SAVE ERROR] Failed to save session:', error);
+          console.error('[SAVE ERROR] Session ID:', session.session_id);
+          console.error('[SAVE ERROR] Device count:', session.devices.length);
           throw error;
         }
       },

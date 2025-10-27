@@ -103,13 +103,23 @@ export default function HomePage() {
     setUploadError(null);
 
     try {
-      // Fetch the full session data from blob storage
-      const response = await fetch(sessionMetadata.blob_url);
+      // Fetch the full session data from blob storage with cache-busting
+      // Add timestamp to prevent browser/CDN caching of old session data
+      const cacheBustingUrl = `${sessionMetadata.blob_url}${sessionMetadata.blob_url.includes('?') ? '&' : '?'}_t=${Date.now()}`;
+      
+      // Note: Don't add custom headers as Vercel Blob CORS doesn't allow them
+      // The timestamp query parameter is sufficient for cache-busting
+      const response = await fetch(cacheBustingUrl, {
+        cache: 'no-store' // Prevent browser caching
+      });
+      
       if (!response.ok) {
-        throw new Error('Failed to load session data');
+        throw new Error(`Failed to load session data: ${response.status} ${response.statusText}`);
       }
 
       const sessionData = await response.json();
+      
+      console.log(`Loaded session ${sessionData.session_id} with ${sessionData.devices.length} devices, last updated: ${sessionData.last_updated}`);
       
       // Load the session into the store
       setSession(sessionData);
@@ -118,7 +128,7 @@ export default function HomePage() {
       router.push(`/check/${sessionMetadata.session_id}`);
     } catch (error) {
       console.error('Failed to resume session:', error);
-      setUploadError('Failed to load session. Please try again.');
+      setUploadError(`Failed to load session: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
       setIsUploading(false);
     }
@@ -130,10 +140,41 @@ export default function HomePage() {
       return;
     }
 
-    // For now, just navigate to the session URL
-    // The session will be loaded from local storage if available
-    router.push(`/check/${resumeSessionId.trim()}`);
-  }, [router, resumeSessionId]);
+    setIsUploading(true);
+    setUploadError(null);
+
+    try {
+      // First, try to find the session in the recent sessions list
+      const matchingSession = recentSessions.find(s => s.session_id === resumeSessionId.trim());
+      
+      if (matchingSession && matchingSession.blob_url) {
+        // Use the handleResumeSession function which has proper cache-busting
+        await handleResumeSession(matchingSession);
+      } else {
+        // If not found in recent sessions, construct blob URL and try to load
+        // This handles cases where session ID is from another user or device
+        const sessionUrl = `https://blob.vercel-storage.com/sessions/${resumeSessionId.trim()}.json`;
+        const cacheBustingUrl = `${sessionUrl}?_t=${Date.now()}`;
+        
+        const response = await fetch(cacheBustingUrl, {
+          cache: 'no-store'
+        });
+        
+        if (!response.ok) {
+          throw new Error(`Session not found or inaccessible (${response.status})`);
+        }
+        
+        const sessionData = await response.json();
+        setSession(sessionData);
+        router.push(`/check/${resumeSessionId.trim()}`);
+      }
+    } catch (error) {
+      console.error('Failed to resume session by ID:', error);
+      setUploadError(`Failed to load session: ${error instanceof Error ? error.message : 'Session not found'}`);
+    } finally {
+      setIsUploading(false);
+    }
+  }, [router, resumeSessionId, recentSessions, handleResumeSession, setSession]);
 
   const handleDeleteSession = useCallback(async (sessionId: string) => {
     try {

@@ -11,20 +11,74 @@ import { BatchControls } from '@/components/BatchControls';
 import { ExportModal } from '@/components/ExportModal';
 import { AuthButton } from '@/components/AuthButton';
 
-export default function CheckPage() {
+export default function CheckPage({ params }: { params: Promise<{ sessionId: string }> }) {
   const router = useRouter();
-  const { session, current_batch, setCurrentBatch, saveProgress, exportResults } = useAppStore();
+  const { session, current_batch, setCurrentBatch, saveProgress, exportResults, setSession } = useAppStore();
   const currentBatch = useCurrentBatch();
   const { saveNow, isAutoSaveActive } = useAutoSave();
   const [showExportModal, setShowExportModal] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [isLoadingSession, setIsLoadingSession] = useState(false);
+  const [sessionId, setSessionId] = useState<string | null>(null);
 
-  // Redirect if no session
+  // Extract sessionId from params
   useEffect(() => {
-    if (!session) {
+    params.then(p => setSessionId(p.sessionId));
+  }, [params]);
+
+  // Load session if not already loaded (for direct URL access)
+  useEffect(() => {
+    if (!sessionId) return;
+    
+    // If we already have a session with matching ID, no need to load
+    if (session && session.session_id === sessionId) return;
+    
+    // If no session or different session ID, try to load from cloud
+    const loadSession = async () => {
+      setIsLoadingSession(true);
+      try {
+        // First try to get session list to find blob URL
+        const listResponse = await fetch('/api/sessions');
+        if (listResponse.ok) {
+          const data = await listResponse.json();
+          const matchingSession = data.sessions?.find((s: { session_id: string; blob_url?: string }) => s.session_id === sessionId);
+          
+          if (matchingSession?.blob_url) {
+            // Load session with cache-busting
+            const cacheBustingUrl = `${matchingSession.blob_url}?_t=${Date.now()}`;
+            const sessionResponse = await fetch(cacheBustingUrl, {
+              cache: 'no-store'
+            });
+            
+            if (sessionResponse.ok) {
+              const sessionData = await sessionResponse.json();
+              setSession(sessionData);
+              console.log(`Session ${sessionId} loaded successfully from cloud`);
+              return;
+            }
+          }
+        }
+        
+        // If not found, redirect to home
+        console.warn(`Session ${sessionId} not found, redirecting to home`);
+        router.push('/');
+      } catch (error) {
+        console.error('Failed to load session:', error);
+        router.push('/');
+      } finally {
+        setIsLoadingSession(false);
+      }
+    };
+    
+    loadSession();
+  }, [sessionId, session, router, setSession]);
+
+  // Redirect if no session after loading attempt
+  useEffect(() => {
+    if (!isLoadingSession && !session && sessionId) {
       router.push('/');
     }
-  }, [session, router]);
+  }, [session, router, isLoadingSession, sessionId]);
 
   // Auto-scroll to top when batch changes
   useEffect(() => {
@@ -78,7 +132,8 @@ export default function CheckPage() {
     return () => window.removeEventListener('keydown', handleKeyPress);
   }, [current_batch, session, setCurrentBatch, saveProgress, handleSaveAndPause]);
 
-  if (!session || !currentBatch) {
+  // Show loading state - ALL HOOKS MUST BE CALLED BEFORE THIS POINT
+  if (isLoadingSession || !sessionId || !session || !currentBatch) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="text-center space-y-4">
