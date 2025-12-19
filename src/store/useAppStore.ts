@@ -213,12 +213,33 @@ export const useAppStore = create<AppStore>((set, get) => ({
             last_updated: saveTimestamp
           };
 
+          // Convert to JSON and compress
+          const jsonString = JSON.stringify(sessionToSave);
+          const originalSize = new Blob([jsonString]).size;
+          console.log(`[SAVE] Original size: ${(originalSize / 1024 / 1024).toFixed(2)} MB`);
+
+          // Compress the data using gzip
+          const encoder = new TextEncoder();
+          const jsonBytes = encoder.encode(jsonString);
+          const stream = new ReadableStream({
+            start(controller) {
+              controller.enqueue(jsonBytes);
+              controller.close();
+            }
+          });
+          
+          const compressedStream = stream.pipeThrough(new CompressionStream('gzip'));
+          const compressedBlob = await new Response(compressedStream).blob();
+          const compressedSize = compressedBlob.size;
+          console.log(`[SAVE] Compressed size: ${(compressedSize / 1024 / 1024).toFixed(2)} MB (${((1 - compressedSize / originalSize) * 100).toFixed(1)}% reduction)`);
+
           const response = await fetch('/api/sessions', {
             method: 'POST',
             headers: {
-              'Content-Type': 'application/json',
+              'Content-Type': 'application/gzip',
+              'Content-Encoding': 'gzip',
             },
-            body: JSON.stringify(sessionToSave),
+            body: compressedBlob,
           });
 
           if (!response.ok) {

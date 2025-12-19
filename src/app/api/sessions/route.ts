@@ -2,10 +2,35 @@ import { put, list } from '@vercel/blob';
 import { NextResponse } from 'next/server';
 import type { CheckingSession } from '@/types/device';
 
+// Configure API route
+export const maxDuration = 60; // Maximum duration of 60 seconds
+
 // POST - Save session to blob
 export async function POST(request: Request) {
   try {
-    const sessionData: CheckingSession = await request.json();
+    const contentType = request.headers.get('Content-Type');
+    let sessionData: CheckingSession;
+
+    // Check if data is compressed
+    if (contentType === 'application/gzip' || request.headers.get('Content-Encoding') === 'gzip') {
+      console.log('[API] Receiving compressed session data');
+      
+      // Get the compressed blob
+      const compressedBlob = await request.blob();
+      console.log(`[API] Compressed size: ${(compressedBlob.size / 1024 / 1024).toFixed(2)} MB`);
+      
+      // Decompress using DecompressionStream
+      const decompressedStream = compressedBlob.stream().pipeThrough(new DecompressionStream('gzip'));
+      const decompressedBlob = await new Response(decompressedStream).blob();
+      const decompressedText = await decompressedBlob.text();
+      console.log(`[API] Decompressed size: ${(decompressedBlob.size / 1024 / 1024).toFixed(2)} MB`);
+      
+      sessionData = JSON.parse(decompressedText);
+    } else {
+      // Fallback to regular JSON parsing for backwards compatibility
+      sessionData = await request.json();
+    }
+
     const filename = `sessions/${sessionData.session_id}.json`;
 
     // Convert session data to JSON blob
@@ -20,6 +45,8 @@ export async function POST(request: Request) {
       allowOverwrite: true, // Allow overwriting existing sessions for progress updates
     });
 
+    console.log(`[API] Session ${sessionData.session_id} saved successfully (${sessionData.devices.length} devices)`);
+
     return NextResponse.json({
       success: true,
       url: blob.url,
@@ -29,7 +56,7 @@ export async function POST(request: Request) {
   } catch (error) {
     console.error('Error saving session:', error);
     return NextResponse.json(
-      { error: 'Failed to save session' },
+      { error: 'Failed to save session', details: error instanceof Error ? error.message : String(error) },
       { status: 500 }
     );
   }

@@ -1,0 +1,23 @@
+{
+  "functions": {
+    "app/api/sessions/route.ts": {
+      "maxDuration": 60,
+      "memory": 1024
+    },
+    "app/api/sessions/[sessionId]/route.ts": {
+      "maxDuration": 60,
+      "memory": 1024
+    }
+  },
+  "headers": [
+    {
+      "source": "/api/(.*)",
+      "headers": [
+        {
+          "key": "Access-Control-Max-Age",
+          "value": "86400"
+        }
+      ]
+    }
+  ]
+}
