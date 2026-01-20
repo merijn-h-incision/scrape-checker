@@ -11,6 +11,24 @@ import { SessionNamingModal } from '@/components/SessionNamingModal';
 import { AuthButton } from '@/components/AuthButton';
 import type { SessionMetadata, DeviceData } from '@/types/device';
 
+// Helper function to safely format dates
+function formatDate(dateString: string | undefined | null): string {
+  if (!dateString) return 'Unknown date';
+  
+  try {
+    const date = new Date(dateString);
+    if (isNaN(date.getTime())) return 'Invalid date';
+    
+    return date.toLocaleDateString(undefined, {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric'
+    });
+  } catch {
+    return 'Invalid date';
+  }
+}
+
 export default function HomePage() {
   const { data: session, status } = useSession();
   const [isDragOver, setIsDragOver] = useState(false);
@@ -28,7 +46,7 @@ export default function HomePage() {
   const router = useRouter();
   const { setSession } = useAppStore();
 
-  // Load recent sessions from blob storage on component mount
+  // Load recent sessions from database on component mount
   useEffect(() => {
     const loadSessions = async () => {
       try {
@@ -94,32 +112,27 @@ export default function HomePage() {
   }, []);
 
   const handleResumeSession = useCallback(async (sessionMetadata: SessionMetadata) => {
-    if (!sessionMetadata.blob_url) {
-      setUploadError('Session data not available - missing blob URL');
-      return;
-    }
-
     setIsUploading(true);
     setUploadError(null);
 
     try {
-      // Fetch the full session data from blob storage with cache-busting
-      // Add timestamp to prevent browser/CDN caching of old session data
-      const cacheBustingUrl = `${sessionMetadata.blob_url}${sessionMetadata.blob_url.includes('?') ? '&' : '?'}_t=${Date.now()}`;
-      
-      // Note: Don't add custom headers as Vercel Blob CORS doesn't allow them
-      // The timestamp query parameter is sufficient for cache-busting
-      const response = await fetch(cacheBustingUrl, {
-        cache: 'no-store' // Prevent browser caching
+      // Fetch the full session data from Postgres database
+      const response = await fetch(`/api/sessions/${sessionMetadata.session_id}`, {
+        cache: 'no-store'
       });
       
       if (!response.ok) {
         throw new Error(`Failed to load session data: ${response.status} ${response.statusText}`);
       }
 
-      const sessionData = await response.json();
+      const data = await response.json();
       
-      console.log(`Loaded session ${sessionData.session_id} with ${sessionData.devices.length} devices, last updated: ${sessionData.last_updated}`);
+      if (!data.success || !data.session) {
+        throw new Error('Invalid session data received');
+      }
+
+      const sessionData = data.session;
+      console.log(`Loaded session ${sessionData.session_id} with ${sessionData.devices.length} devices, version ${sessionData._version}`);
       
       // Load the session into the store
       setSession(sessionData);
@@ -144,37 +157,30 @@ export default function HomePage() {
     setUploadError(null);
 
     try {
-      // First, try to find the session in the recent sessions list
-      const matchingSession = recentSessions.find(s => s.session_id === resumeSessionId.trim());
+      // Load session directly from database by ID
+      const response = await fetch(`/api/sessions/${resumeSessionId.trim()}`, {
+        cache: 'no-store'
+      });
       
-      if (matchingSession && matchingSession.blob_url) {
-        // Use the handleResumeSession function which has proper cache-busting
-        await handleResumeSession(matchingSession);
-      } else {
-        // If not found in recent sessions, construct blob URL and try to load
-        // This handles cases where session ID is from another user or device
-        const sessionUrl = `https://blob.vercel-storage.com/sessions/${resumeSessionId.trim()}.json`;
-        const cacheBustingUrl = `${sessionUrl}?_t=${Date.now()}`;
-        
-        const response = await fetch(cacheBustingUrl, {
-          cache: 'no-store'
-        });
-        
-        if (!response.ok) {
-          throw new Error(`Session not found or inaccessible (${response.status})`);
-        }
-        
-        const sessionData = await response.json();
-        setSession(sessionData);
-        router.push(`/check/${resumeSessionId.trim()}`);
+      if (!response.ok) {
+        throw new Error(`Session not found or inaccessible (${response.status})`);
       }
+      
+      const data = await response.json();
+      
+      if (!data.success || !data.session) {
+        throw new Error('Invalid session data received');
+      }
+
+      setSession(data.session);
+      router.push(`/check/${resumeSessionId.trim()}`);
     } catch (error) {
       console.error('Failed to resume session by ID:', error);
       setUploadError(`Failed to load session: ${error instanceof Error ? error.message : 'Session not found'}`);
     } finally {
       setIsUploading(false);
     }
-  }, [router, resumeSessionId, recentSessions, handleResumeSession, setSession]);
+  }, [router, resumeSessionId, setSession]);
 
   const handleDeleteSession = useCallback(async (sessionId: string) => {
     try {
@@ -411,7 +417,7 @@ export default function HomePage() {
                 {isLoadingSessions && recentSessions.length === 0 ? (
                   <div className="flex items-center justify-center p-8 text-muted-foreground">
                     <div className="w-5 h-5 border-2 border-primary border-t-transparent rounded-full animate-spin mr-3"></div>
-                    Loading sessions from cloud storage...
+                    Loading sessions from database...
                   </div>
                 ) : (
                   recentSessions.map((session) => (
@@ -434,7 +440,7 @@ export default function HomePage() {
                             </p>
                             <p className="text-xs text-muted-foreground flex items-center">
                               <Clock className="w-3 h-3 mr-1" />
-                              {new Date(session.last_updated).toLocaleDateString()}
+                              {formatDate(session.last_updated)}
                             </p>
                           </div>
                         </div>

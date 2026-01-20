@@ -69,6 +69,7 @@ See [AUTH_SETUP.md](./AUTH_SETUP.md) for complete setup instructions.
 - Node.js 18+ 
 - pnpm (recommended) or npm
 - Google OAuth credentials (for authentication)
+- Vercel account with Postgres database (for production)
 
 ### Installation
 
@@ -89,12 +90,17 @@ pnpm install
    - Add your OAuth credentials and generate an AUTH_SECRET
    - Configure allowed domains in `src/auth.ts`
 
-4. Start the development server:
+4. **Set up Postgres database** (see [POSTGRES_SETUP.md](./POSTGRES_SETUP.md) for detailed instructions):
+   - Create a Vercel Postgres database
+   - Run the database initialization script
+   - Configure environment variables
+
+5. Start the development server:
 ```bash
 pnpm dev
 ```
 
-5. Open [http://localhost:3000](http://localhost:3000) in your browser and sign in with your Google account
+6. Open [http://localhost:3000](http://localhost:3000) in your browser and sign in with your Google account
 
 ### Usage
 
@@ -116,9 +122,11 @@ pnpm dev
 - **Framework**: Next.js 15 with App Router
 - **Language**: TypeScript
 - **Styling**: Tailwind CSS
-- **State Management**: Zustand with persistence
+- **State Management**: Zustand
+- **Database**: Vercel Postgres (Neon) with optimistic locking
 - **CSV Processing**: PapaParse
 - **Icons**: Lucide React
+- **Authentication**: NextAuth.js (Google OAuth)
 
 ## 📁 Project Structure
 
@@ -137,18 +145,36 @@ src/
     └── csvParser.ts    # CSV processing utilities
 ```
 
-## 🔧 Configuration
+## 🔧 Session Management
 
-The application uses local storage to persist review sessions, allowing users to:
-- Resume work after browser refresh
-- Maintain progress across sessions
-- Recover from unexpected interruptions
+The application uses **Vercel Postgres** to store and manage review sessions, providing:
+
+### Multi-User Support
+- **Concurrent Access**: Multiple users can work on different sessions simultaneously
+- **Optimistic Locking**: Prevents data loss from concurrent edits
+- **Conflict Detection**: Alerts users when session conflicts occur
+- **User Association**: Sessions can be linked to authenticated users
+
+### Data Persistence
+- **Cloud Storage**: All sessions stored in Postgres (not local storage)
+- **Cross-Device Sync**: Access your sessions from any device
+- **Auto-Save**: Progress automatically saved every 60 seconds
+- **Manual Save**: Save anytime with the "Save Progress" button
+
+### Session Recovery
+- **Resume Work**: Continue sessions from any device
+- **Version Control**: Track changes with version numbers
+- **Activity Logging**: Full audit trail of all session changes
+
+See [POSTGRES_SETUP.md](./POSTGRES_SETUP.md) for complete setup and migration instructions.
 
 ## 📈 Performance Features
 
 - **Lazy Loading**: Images load on-demand with loading states
 - **Batch Processing**: Efficient handling of large datasets
-- **Local Persistence**: Automatic progress saving
+- **Cloud Persistence**: Automatic progress saving to Postgres
+- **Sub-10ms Queries**: Edge-optimized database queries with Neon
+- **Connection Pooling**: Automatic scaling for concurrent users
 - **Responsive Design**: Works on desktop and tablet devices
 
 ## 🤝 Contributing

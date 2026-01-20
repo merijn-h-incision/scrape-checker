@@ -10,6 +10,7 @@ import { DeviceRow } from '@/components/DeviceRow';
 import { BatchControls } from '@/components/BatchControls';
 import { ExportModal } from '@/components/ExportModal';
 import { AuthButton } from '@/components/AuthButton';
+import { ConflictResolutionModal } from '@/components/ConflictResolutionModal';
 
 export default function CheckPage({ params }: { params: Promise<{ sessionId: string }> }) {
   const router = useRouter();
@@ -33,29 +34,20 @@ export default function CheckPage({ params }: { params: Promise<{ sessionId: str
     // If we already have a session with matching ID, no need to load
     if (session && session.session_id === sessionId) return;
     
-    // If no session or different session ID, try to load from cloud
+    // If no session or different session ID, try to load from Postgres
     const loadSession = async () => {
       setIsLoadingSession(true);
       try {
-        // First try to get session list to find blob URL
-        const listResponse = await fetch('/api/sessions');
-        if (listResponse.ok) {
-          const data = await listResponse.json();
-          const matchingSession = data.sessions?.find((s: { session_id: string; blob_url?: string }) => s.session_id === sessionId);
-          
-          if (matchingSession?.blob_url) {
-            // Load session with cache-busting
-            const cacheBustingUrl = `${matchingSession.blob_url}?_t=${Date.now()}`;
-            const sessionResponse = await fetch(cacheBustingUrl, {
-              cache: 'no-store'
-            });
-            
-            if (sessionResponse.ok) {
-              const sessionData = await sessionResponse.json();
-              setSession(sessionData);
-              console.log(`Session ${sessionId} loaded successfully from cloud`);
-              return;
-            }
+        const sessionResponse = await fetch(`/api/sessions/${sessionId}`, {
+          cache: 'no-store'
+        });
+        
+        if (sessionResponse.ok) {
+          const data = await sessionResponse.json();
+          if (data.success && data.session) {
+            setSession(data.session);
+            console.log(`Session ${sessionId} loaded successfully from database`);
+            return;
           }
         }
         
@@ -279,6 +271,9 @@ export default function CheckPage({ params }: { params: Promise<{ sessionId: str
           }}
         />
       )}
+
+      {/* Conflict Resolution Modal */}
+      <ConflictResolutionModal />
     </div>
   );
 } 

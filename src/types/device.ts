@@ -50,7 +50,8 @@ export interface CheckingSession {
   devices: DeviceData[];
   created_at: string;
   last_updated: string;
-  blob_url?: string; // URL returned from Vercel Blob
+  blob_url?: string; // URL returned from Vercel Blob (deprecated - for migration only)
+  _version?: number; // Version number for optimistic locking (internal use)
 }
 
 export interface BatchInfo {
@@ -84,7 +85,8 @@ export interface SessionMetadata {
   progress_percentage: number;
   last_updated: string;
   created_at: string;
-  blob_url?: string; // URL to blob storage for resuming sessions
+  device_count?: number;
+  completed_device_count?: number;
 }
 
 // Store state interface

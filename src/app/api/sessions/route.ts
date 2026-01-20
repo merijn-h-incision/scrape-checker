@@ -1,25 +1,41 @@
-import { put, list } from '@vercel/blob';
 import { NextResponse } from 'next/server';
+import { auth } from '@/auth';
 import type { CheckingSession } from '@/types/device';
+import {
+  createSession,
+  getSession,
+  updateSession,
+  listSessions,
+  logSessionActivity,
+  OptimisticLockError,
+} from '@/lib/db';
 
 // Configure API route
-export const maxDuration = 60; // Maximum duration of 60 seconds
+export const maxDuration = 60;
+export const dynamic = 'force-dynamic';
 
-// POST - Save session to blob
+// Set body size limit to 50MB for this route
+export const runtime = 'nodejs';
+
+/**
+ * POST - Save or update session to Postgres
+ * Implements optimistic locking to prevent data loss from concurrent edits
+ */
 export async function POST(request: Request) {
   try {
+    // Get authenticated user
+    const session = await auth();
+    const userId = session?.user?.email || undefined;
+
+    // Parse request data (supports both compressed and uncompressed)
     const contentType = request.headers.get('Content-Type');
     let sessionData: CheckingSession;
 
-    // Check if data is compressed
     if (contentType === 'application/gzip' || request.headers.get('Content-Encoding') === 'gzip') {
       console.log('[API] Receiving compressed session data');
-      
-      // Get the compressed blob
       const compressedBlob = await request.blob();
       console.log(`[API] Compressed size: ${(compressedBlob.size / 1024 / 1024).toFixed(2)} MB`);
       
-      // Decompress using DecompressionStream
       const decompressedStream = compressedBlob.stream().pipeThrough(new DecompressionStream('gzip'));
       const decompressedBlob = await new Response(decompressedStream).blob();
       const decompressedText = await decompressedBlob.text();
@@ -27,86 +43,129 @@ export async function POST(request: Request) {
       
       sessionData = JSON.parse(decompressedText);
     } else {
-      // Fallback to regular JSON parsing for backwards compatibility
-      sessionData = await request.json();
+      const bodyText = await request.text();
+      sessionData = JSON.parse(bodyText);
     }
 
-    const filename = `sessions/${sessionData.session_id}.json`;
+    // Check if session exists in database
+    const existingSession = await getSession(sessionData.session_id);
+    
+    let savedSession;
+    let action: 'created' | 'updated';
 
-    // Convert session data to JSON blob
-    const sessionBlob = new Blob([JSON.stringify(sessionData, null, 2)], {
-      type: 'application/json',
-    });
+    if (existingSession) {
+      // Update existing session with optimistic locking
+      action = 'updated';
+      const currentVersion = existingSession._version || 1;
+      
+      try {
+        const result = await updateSession(sessionData, currentVersion);
+        savedSession = result;
+        console.log(`[API] Session ${sessionData.session_id} updated successfully (version ${currentVersion} → ${result.version})`);
+      } catch (error) {
+        if (error instanceof OptimisticLockError) {
+          console.error('[API] Optimistic lock conflict:', error.message);
+          
+          // Log the conflict
+          await logSessionActivity(
+            sessionData.session_id,
+            'conflict',
+            userId,
+            currentVersion,
+            {
+              attempted_version: error.attemptedVersion,
+              current_version: error.currentVersion,
+            }
+          );
 
-    // Upload to Vercel Blob storage
-    const blob = await put(filename, sessionBlob, {
-      access: 'public',
-      token: process.env.SCRAPE_BLOB_READ_WRITE_TOKEN,
-      allowOverwrite: true, // Allow overwriting existing sessions for progress updates
-    });
+          return NextResponse.json(
+            {
+              error: 'CONFLICT',
+              message: error.message,
+              currentVersion: error.currentVersion,
+              attemptedVersion: error.attemptedVersion,
+            },
+            { status: 409 } // Conflict
+          );
+        }
+        throw error;
+      }
+    } else {
+      // Create new session
+      action = 'created';
+      const result = await createSession(sessionData, userId);
+      savedSession = result;
+      console.log(`[API] Session ${sessionData.session_id} created successfully (${sessionData.devices.length} devices)`);
+    }
 
-    console.log(`[API] Session ${sessionData.session_id} saved successfully (${sessionData.devices.length} devices)`);
+    // Log activity
+    await logSessionActivity(
+      sessionData.session_id,
+      action,
+      userId,
+      savedSession.version,
+      {
+        device_count: sessionData.devices.length,
+        progress: sessionData.progress_percentage,
+      }
+    );
 
     return NextResponse.json({
       success: true,
-      url: blob.url,
-      sessionId: sessionData.session_id,
-      lastSaved: sessionData.last_updated,
+      sessionId: savedSession.session_id,
+      version: savedSession.version,
+      lastSaved: savedSession.updated_at,
     });
   } catch (error) {
-    console.error('Error saving session:', error);
+    console.error('[API] Error saving session:', error);
     return NextResponse.json(
-      { error: 'Failed to save session', details: error instanceof Error ? error.message : String(error) },
+      {
+        error: 'SAVE_FAILED',
+        message: 'Failed to save session',
+        details: error instanceof Error ? error.message : String(error),
+      },
       { status: 500 }
     );
   }
 }
 
-// GET - List all sessions from blob storage
-export async function GET() {
+/**
+ * GET - List all sessions (collaborative mode - all users see all sessions)
+ */
+export async function GET(request: Request) {
   try {
-    const { blobs } = await list({
-      prefix: 'sessions/',
-      token: process.env.SCRAPE_BLOB_READ_WRITE_TOKEN,
-    });
+    // Get authenticated user for logging purposes
+    const session = await auth();
+    const userId = session?.user?.email;
 
-    // Fetch metadata from each session file
-    const sessionPromises = blobs.map(async (blob) => {
-      try {
-        const response = await fetch(blob.url);
-        const sessionData: CheckingSession = await response.json();
-        
-        return {
-          session_id: sessionData.session_id,
-          session_name: sessionData.session_name,
-          filename: sessionData.filename,
-          total_rows: sessionData.total_rows,
-          progress_percentage: sessionData.progress_percentage,
-          last_updated: sessionData.last_updated,
-          created_at: sessionData.created_at,
-          blob_url: blob.url,
-        };
-      } catch (error) {
-        console.error(`Failed to fetch session from ${blob.url}:`, error);
-        return null;
-      }
-    });
+    // Parse query parameters
+    const { searchParams } = new URL(request.url);
+    const limit = parseInt(searchParams.get('limit') || '100', 10);
+    const offset = parseInt(searchParams.get('offset') || '0', 10);
 
-    const sessions = await Promise.all(sessionPromises);
-    const validSessions = sessions.filter(session => session !== null);
+    // List ALL sessions (no user filter for collaborative work)
+    const sessions = await listSessions(
+      undefined, // No user filter - show all sessions
+      limit,
+      offset
+    );
 
-    // Sort by last_updated (most recent first)
-    validSessions.sort((a, b) => new Date(b!.last_updated).getTime() - new Date(a!.last_updated).getTime());
+    console.log(`[API] Listed ${sessions.length} sessions (collaborative mode)`);
 
     return NextResponse.json({
       success: true,
-      sessions: validSessions,
-      total: validSessions.length,
+      sessions,
+      total: sessions.length,
+      userId: userId || null,
     });
   } catch (error) {
-    console.error('Error listing sessions:', error);
+    console.error('[API] Error listing sessions:', error);
     return NextResponse.json(
-      { error: 'Failed to list sessions' },
+      {
+        error: 'LIST_FAILED',
+        message: 'Failed to list sessions',
+        details: error instanceof Error ? error.message : String(error),
+      },
       { status: 500 }
     );
   }
