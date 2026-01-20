@@ -21,6 +21,8 @@ export interface SessionRow {
   updated_at: string;
   version: number;
   devices: unknown; // JSONB
+  locked_by: string | null;
+  locked_at: string | null;
 }
 
 export interface SessionSummary {
@@ -44,6 +46,17 @@ export class OptimisticLockError extends Error {
   ) {
     super(message);
     this.name = 'OptimisticLockError';
+  }
+}
+
+export class SessionLockedError extends Error {
+  constructor(
+    message: string,
+    public lockedBy: string,
+    public lockedAt: string
+  ) {
+    super(message);
+    this.name = 'SessionLockedError';
   }
 }
 
@@ -110,6 +123,78 @@ export async function getSession(sessionId: string): Promise<CheckingSession | n
   }
 
   return rowToSession(result.rows[0]);
+}
+
+/**
+ * Try to lock a session for editing
+ * Throws SessionLockedError if already locked by another user (within 5 minutes)
+ */
+export async function lockSession(
+  sessionId: string,
+  userId: string
+): Promise<boolean> {
+  // Check if session is locked by someone else (within last 5 minutes)
+  const checkResult = await sql<SessionRow>`
+    SELECT locked_by, locked_at FROM sessions
+    WHERE session_id = ${sessionId}
+    AND locked_by IS NOT NULL
+    AND locked_by != ${userId}
+    AND locked_at > NOW() - INTERVAL '5 minutes'
+    LIMIT 1
+  `;
+
+  if (checkResult.rows.length > 0) {
+    const lock = checkResult.rows[0];
+    throw new SessionLockedError(
+      `This session is currently being edited by another user. Please try again later or contact them to coordinate.`,
+      lock.locked_by!,
+      lock.locked_at!
+    );
+  }
+
+  // Lock the session (or refresh the lock if already ours)
+  await sql`
+    UPDATE sessions
+    SET 
+      locked_by = ${userId},
+      locked_at = NOW()
+    WHERE session_id = ${sessionId}
+  `;
+
+  return true;
+}
+
+/**
+ * Unlock a session when user is done
+ */
+export async function unlockSession(
+  sessionId: string,
+  userId: string
+): Promise<void> {
+  await sql`
+    UPDATE sessions
+    SET 
+      locked_by = NULL,
+      locked_at = NULL
+    WHERE session_id = ${sessionId}
+    AND locked_by = ${userId}
+  `;
+}
+
+/**
+ * Refresh session lock (keep-alive)
+ * Call this periodically (every minute) to maintain the lock
+ */
+export async function refreshSessionLock(
+  sessionId: string,
+  userId: string
+): Promise<void> {
+  await sql`
+    UPDATE sessions
+    SET locked_at = NOW()
+    WHERE session_id = ${sessionId}
+    AND locked_by = ${userId}
+  `;
 }
 
 /**

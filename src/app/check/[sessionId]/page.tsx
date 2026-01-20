@@ -11,6 +11,7 @@ import { BatchControls } from '@/components/BatchControls';
 import { ExportModal } from '@/components/ExportModal';
 import { AuthButton } from '@/components/AuthButton';
 import { ConflictResolutionModal } from '@/components/ConflictResolutionModal';
+import { SessionLockedModal } from '@/components/SessionLockedModal';
 
 export default function CheckPage({ params }: { params: Promise<{ sessionId: string }> }) {
   const router = useRouter();
@@ -21,6 +22,10 @@ export default function CheckPage({ params }: { params: Promise<{ sessionId: str
   const [isSaving, setIsSaving] = useState(false);
   const [isLoadingSession, setIsLoadingSession] = useState(false);
   const [sessionId, setSessionId] = useState<string | null>(null);
+  const [sessionLocked, setSessionLocked] = useState<{
+    lockedBy: string;
+    lockedAt: string;
+  } | null>(null);
 
   // Extract sessionId from params
   useEffect(() => {
@@ -37,10 +42,22 @@ export default function CheckPage({ params }: { params: Promise<{ sessionId: str
     // If no session or different session ID, try to load from Postgres
     const loadSession = async () => {
       setIsLoadingSession(true);
+      setSessionLocked(null);
       try {
         const sessionResponse = await fetch(`/api/sessions/${sessionId}`, {
           cache: 'no-store'
         });
+        
+        if (sessionResponse.status === 423) {
+          // Session is locked by another user
+          const data = await sessionResponse.json();
+          setSessionLocked({
+            lockedBy: data.lockedBy,
+            lockedAt: data.lockedAt,
+          });
+          setIsLoadingSession(false);
+          return;
+        }
         
         if (sessionResponse.ok) {
           const data = await sessionResponse.json();
@@ -67,10 +84,63 @@ export default function CheckPage({ params }: { params: Promise<{ sessionId: str
 
   // Redirect if no session after loading attempt
   useEffect(() => {
-    if (!isLoadingSession && !session && sessionId) {
+    if (!isLoadingSession && !session && sessionId && !sessionLocked) {
       router.push('/');
     }
-  }, [session, router, isLoadingSession, sessionId]);
+  }, [session, router, isLoadingSession, sessionId, sessionLocked]);
+
+  // Heartbeat to maintain session lock (every 60 seconds)
+  useEffect(() => {
+    if (!sessionId || !session) return;
+
+    const heartbeat = setInterval(async () => {
+      try {
+        await fetch(`/api/sessions/${sessionId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'refresh' }),
+        });
+        console.log('Session lock refreshed');
+      } catch (error) {
+        console.error('Failed to refresh session lock:', error);
+      }
+    }, 60000); // Every 60 seconds
+
+    return () => clearInterval(heartbeat);
+  }, [sessionId, session]);
+
+  // Unlock session when leaving page
+  useEffect(() => {
+    if (!sessionId || !session) return;
+
+    const unlockSession = async () => {
+      try {
+        await fetch(`/api/sessions/${sessionId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'unlock' }),
+        });
+        console.log('Session unlocked');
+      } catch (error) {
+        console.error('Failed to unlock session:', error);
+      }
+    };
+
+    // Unlock on page unload
+    const handleBeforeUnload = () => {
+      // Use sendBeacon for reliable delivery during unload
+      const data = JSON.stringify({ action: 'unlock' });
+      navigator.sendBeacon(`/api/sessions/${sessionId}`, data);
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+
+    // Unlock when component unmounts (navigation away)
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      unlockSession();
+    };
+  }, [sessionId, session]);
 
   // Auto-scroll to top when batch changes
   useEffect(() => {
@@ -123,6 +193,17 @@ export default function CheckPage({ params }: { params: Promise<{ sessionId: str
     window.addEventListener('keydown', handleKeyPress);
     return () => window.removeEventListener('keydown', handleKeyPress);
   }, [current_batch, session, setCurrentBatch, saveProgress, handleSaveAndPause]);
+
+  // Show session locked modal if applicable
+  if (sessionLocked) {
+    return (
+      <SessionLockedModal
+        lockedBy={sessionLocked.lockedBy}
+        lockedAt={sessionLocked.lockedAt}
+        onClose={() => router.push('/')}
+      />
+    );
+  }
 
   // Show loading state - ALL HOOKS MUST BE CALLED BEFORE THIS POINT
   if (isLoadingSession || !sessionId || !session || !currentBatch) {

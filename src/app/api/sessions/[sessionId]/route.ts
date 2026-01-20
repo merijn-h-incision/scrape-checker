@@ -4,11 +4,15 @@ import {
   getSession,
   deleteSession,
   logSessionActivity,
+  lockSession,
+  unlockSession,
+  refreshSessionLock,
+  SessionLockedError,
 } from '@/lib/db';
 
 /**
  * GET - Load a specific session by ID
- * This endpoint is now fully functional with Postgres backend
+ * Attempts to lock the session for the requesting user
  */
 export async function GET(
   request: NextRequest,
@@ -16,6 +20,8 @@ export async function GET(
 ) {
   try {
     const { sessionId } = await params;
+    const session = await auth();
+    const userId = session?.user?.email || undefined;
 
     if (!sessionId) {
       return NextResponse.json(
@@ -25,20 +31,42 @@ export async function GET(
     }
 
     // Get session from database
-    const session = await getSession(sessionId);
+    const sessionData = await getSession(sessionId);
 
-    if (!session) {
+    if (!sessionData) {
       return NextResponse.json(
         { error: 'Session not found' },
         { status: 404 }
       );
     }
 
-    console.log(`[API] Session ${sessionId} loaded successfully (version ${session._version}, ${session.devices?.length || 0} devices)`);
+    // Try to lock the session for this user
+    if (userId) {
+      try {
+        await lockSession(sessionId, userId);
+        console.log(`[API] Session ${sessionId} locked by ${userId}`);
+      } catch (error) {
+        if (error instanceof SessionLockedError) {
+          console.log(`[API] Session ${sessionId} already locked by ${error.lockedBy}`);
+          return NextResponse.json(
+            {
+              error: 'SESSION_LOCKED',
+              message: error.message,
+              lockedBy: error.lockedBy,
+              lockedAt: error.lockedAt,
+            },
+            { status: 423 } // 423 Locked
+          );
+        }
+        throw error;
+      }
+    }
+
+    console.log(`[API] Session ${sessionId} loaded successfully (version ${sessionData._version}, ${sessionData.devices?.length || 0} devices)`);
 
     return NextResponse.json({
       success: true,
-      session,
+      session: sessionData,
     });
   } catch (error) {
     console.error('[API] Error loading session:', error);
@@ -48,6 +76,44 @@ export async function GET(
         message: 'Failed to load session',
         details: error instanceof Error ? error.message : String(error),
       },
+      { status: 500 }
+    );
+  }
+}
+
+/**
+ * PATCH - Unlock or refresh session lock
+ */
+export async function PATCH(
+  request: NextRequest,
+  { params }: { params: Promise<{ sessionId: string }> }
+) {
+  try {
+    const { sessionId } = await params;
+    const session = await auth();
+    const userId = session?.user?.email || undefined;
+    const body = await request.json();
+    const action = body.action; // 'unlock' or 'refresh'
+
+    if (!sessionId || !userId) {
+      return NextResponse.json(
+        { error: 'Session ID and user required' },
+        { status: 400 }
+      );
+    }
+
+    if (action === 'unlock') {
+      await unlockSession(sessionId, userId);
+      console.log(`[API] Session ${sessionId} unlocked by ${userId}`);
+    } else if (action === 'refresh') {
+      await refreshSessionLock(sessionId, userId);
+    }
+
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error('[API] Error updating session lock:', error);
+    return NextResponse.json(
+      { error: 'Failed to update lock' },
       { status: 500 }
     );
   }
