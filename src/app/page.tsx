@@ -9,6 +9,7 @@ import { parseCSVFile, createSessionFromDevices } from '@/utils/csvParser';
 // Session management now handled via API
 import { SessionNamingModal } from '@/components/SessionNamingModal';
 import { AuthButton } from '@/components/AuthButton';
+import { SessionLockedModal } from '@/components/SessionLockedModal';
 import type { SessionMetadata, DeviceData } from '@/types/device';
 
 // Helper function to safely format dates
@@ -42,6 +43,10 @@ export default function HomePage() {
   const [pendingSessionData, setPendingSessionData] = useState<{
     devices: DeviceData[];
     filename: string;
+  } | null>(null);
+  const [sessionLocked, setSessionLocked] = useState<{
+    lockedBy: string;
+    lockedAt: string;
   } | null>(null);
   const router = useRouter();
   const { setSession } = useAppStore();
@@ -114,12 +119,24 @@ export default function HomePage() {
   const handleResumeSession = useCallback(async (sessionMetadata: SessionMetadata) => {
     setIsUploading(true);
     setUploadError(null);
+    setSessionLocked(null);
 
     try {
       // Fetch the full session data from Postgres database
       const response = await fetch(`/api/sessions/${sessionMetadata.session_id}`, {
         cache: 'no-store'
       });
+      
+      // Check if session is locked by another user
+      if (response.status === 423) {
+        const data = await response.json();
+        setSessionLocked({
+          lockedBy: data.lockedBy,
+          lockedAt: data.lockedAt,
+        });
+        setIsUploading(false);
+        return;
+      }
       
       if (!response.ok) {
         throw new Error(`Failed to load session data: ${response.status} ${response.statusText}`);
@@ -550,6 +567,15 @@ export default function HomePage() {
           defaultName={pendingSessionData.filename.replace('.csv', '')}
           onConfirm={handleSessionNameConfirm}
           onSkip={handleSessionNameSkip}
+        />
+      )}
+
+      {/* Session Locked Modal */}
+      {sessionLocked && (
+        <SessionLockedModal
+          lockedBy={sessionLocked.lockedBy}
+          lockedAt={sessionLocked.lockedAt}
+          onClose={() => setSessionLocked(null)}
         />
       )}
     </div>
