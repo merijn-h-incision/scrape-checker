@@ -8,7 +8,7 @@ interface BatchControlsProps {
   totalBatches: number;
   hasUncheckedItems: boolean;
   onPrevious: () => void;
-  onSaveAndNext: () => void;
+  onNext: () => void;
   onSaveAndPause: () => void;
 }
 
@@ -17,7 +17,7 @@ export function BatchControls({
   totalBatches,
   hasUncheckedItems,
   onPrevious,
-  onSaveAndNext,
+  onNext,
   onSaveAndPause
 }: BatchControlsProps) {
   const isFirstBatch = currentBatch <= 1;
@@ -63,7 +63,7 @@ export function BatchControls({
 
         {/* Next Button */}
         <button
-          onClick={onSaveAndNext}
+          onClick={onNext}
           disabled={isLastBatch}
           className={cn(
             "flex items-center space-x-2 px-4 py-2 rounded-lg transition-colors",
@@ -72,7 +72,7 @@ export function BatchControls({
               : "bg-primary text-primary-foreground hover:bg-primary/90"
           )}
         >
-          <span>{isLastBatch ? 'Completed' : 'Save & Next'}</span>
+          <span>{isLastBatch ? 'Completed' : 'Next Batch'}</span>
           {!isLastBatch && <ArrowRight className="w-4 h-4" />}
         </button>
       </div>

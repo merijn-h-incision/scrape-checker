@@ -223,17 +223,9 @@ export default function CheckPage({ params }: { params: Promise<{ sessionId: str
     }
   };
 
-  const handleSaveAndNext = async () => {
-    setIsSaving(true);
-    try {
-      await saveNow();
-      if (current_batch < session.total_batches) {
-        setCurrentBatch(current_batch + 1);
-      }
-    } catch (error) {
-      console.error('Save failed:', error);
-    } finally {
-      setIsSaving(false);
+  const handleNext = () => {
+    if (current_batch < session.total_batches) {
+      setCurrentBatch(current_batch + 1);
     }
   };
 
@@ -335,7 +327,7 @@ export default function CheckPage({ params }: { params: Promise<{ sessionId: str
             totalBatches={session.total_batches}
             hasUncheckedItems={hasUncheckedItems}
             onPrevious={() => handleBatchNavigation(current_batch - 1)}
-            onSaveAndNext={handleSaveAndNext}
+            onNext={handleNext}
             onSaveAndPause={handleSaveAndPause}
           />
         </div>
