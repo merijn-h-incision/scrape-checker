@@ -2,8 +2,7 @@
   "functions": {
     "app/api/sessions/route.ts": {
       "maxDuration": 60,
-      "memory": 1024,
-      "maxRequestBodySize": 52428800
+      "memory": 1024
     },
     "app/api/sessions/[sessionId]/route.ts": {
       "maxDuration": 60,
