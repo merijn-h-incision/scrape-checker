@@ -57,11 +57,11 @@ export function ConflictResolutionModal() {
               Your session has been updated by another user or device.
             </p>
             <p className="text-sm text-gray-600">
-              The session you're working on has been modified since you last loaded it. 
+              The session you&apos;re working on has been modified since you last loaded it. 
               This typically happens when:
             </p>
             <ul className="text-sm text-gray-600 list-disc list-inside space-y-1 ml-2">
-              <li>You're working on the same session from multiple devices</li>
+              <li>You&apos;re working on the same session from multiple devices</li>
               <li>Another user has updated the session</li>
               <li>You have multiple browser tabs open with the same session</li>
             </ul>

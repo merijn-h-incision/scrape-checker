@@ -63,7 +63,7 @@ export async function DELETE(
   try {
     const { sessionId } = await params;
     const session = await auth();
-    const userId = session?.user?.email;
+    const userId = session?.user?.email || undefined;
 
     if (!sessionId) {
       return NextResponse.json(
