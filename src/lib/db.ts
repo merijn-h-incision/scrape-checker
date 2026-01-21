@@ -23,6 +23,8 @@ export interface SessionRow {
   devices: unknown; // JSONB
   locked_by: string | null;
   locked_at: string | null;
+  device_count: number;
+  completed_device_count: number;
 }
 
 export interface SessionSummary {
@@ -72,6 +74,12 @@ export async function createSession(
     ? `{${completedBatches.join(',')}}` 
     : '{}';
 
+  // Calculate device counts to avoid expensive JSONB queries later
+  const deviceCount = session.devices.length;
+  const completedDeviceCount = session.devices.filter(d => 
+    d.status === 'approved' || d.status === 'custom_selected' || d.status === 'rejected'
+  ).length;
+
   const result = await sql<SessionRow>`
     INSERT INTO sessions (
       session_id,
@@ -84,7 +92,9 @@ export async function createSession(
       total_batches,
       completed_batches,
       devices,
-      version
+      version,
+      device_count,
+      completed_device_count
     ) VALUES (
       ${session.session_id},
       ${session.session_name},
@@ -96,7 +106,9 @@ export async function createSession(
       ${session.total_batches},
       ${completedBatchesArray}::integer[],
       ${JSON.stringify(session.devices)}::jsonb,
-      1
+      1,
+      ${deviceCount},
+      ${completedDeviceCount}
     )
     RETURNING *
   `;
@@ -210,6 +222,12 @@ export async function updateSession(
     ? `{${completedBatches.join(',')}}` 
     : '{}';
 
+  // Calculate device counts to avoid expensive JSONB queries later
+  const deviceCount = session.devices.length;
+  const completedDeviceCount = session.devices.filter(d => 
+    d.status === 'approved' || d.status === 'custom_selected' || d.status === 'rejected'
+  ).length;
+
   const result = await sql<SessionRow>`
     UPDATE sessions
     SET
@@ -218,6 +236,8 @@ export async function updateSession(
       current_batch = ${session.current_batch || 1},
       completed_batches = ${completedBatchesArray}::integer[],
       devices = ${JSON.stringify(session.devices)}::jsonb,
+      device_count = ${deviceCount},
+      completed_device_count = ${completedDeviceCount},
       version = version + 1
     WHERE session_id = ${session.session_id}
       AND version = ${expectedVersion}
