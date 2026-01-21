@@ -59,6 +59,7 @@ export async function POST(request: Request) {
         access: 'public',
         contentType: 'application/json',
         addRandomSuffix: false, // Use consistent filename for overwriting
+        allowOverwrite: true, // Allow overwriting existing session data
         token: blobToken,
       }
     );
