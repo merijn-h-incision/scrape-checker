@@ -51,6 +51,7 @@ export async function POST(request: Request) {
     // Upload devices array to Blob storage
     console.log(`[API] Uploading ${sessionData.devices.length} devices to Blob`);
     const devicesJson = JSON.stringify(sessionData.devices);
+    const blobToken = process.env.SCRAPE_BLOB_READ_WRITE_TOKEN || process.env.BLOB_READ_WRITE_TOKEN;
     const blob = await put(
       `sessions/${sessionData.session_id}/devices.json`,
       devicesJson,
@@ -58,6 +59,7 @@ export async function POST(request: Request) {
         access: 'public',
         contentType: 'application/json',
         addRandomSuffix: false, // Use consistent filename for overwriting
+        token: blobToken,
       }
     );
     const blobUrl = blob.url;

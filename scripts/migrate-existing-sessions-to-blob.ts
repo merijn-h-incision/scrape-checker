@@ -14,8 +14,11 @@
 
 import { sql } from '@vercel/postgres';
 import { put } from '@vercel/blob';
+import dotenv from 'dotenv';
+import { resolve } from 'path';
 
-// Environment variables are automatically loaded from .env.local by Vercel
+// Load environment variables from .env.local
+dotenv.config({ path: resolve(process.cwd(), '.env.local') });
 
 interface SessionRow {
   session_id: string;
@@ -33,6 +36,12 @@ async function migrateSession(session: SessionRow): Promise<void> {
     
     console.log(`  - Found ${devices.length} devices in JSONB`);
     
+    // Get Blob token from env
+    const blobToken = process.env.SCRAPE_BLOB_READ_WRITE_TOKEN || process.env.BLOB_READ_WRITE_TOKEN;
+    if (!blobToken) {
+      throw new Error('SCRAPE_BLOB_READ_WRITE_TOKEN environment variable not found');
+    }
+    
     // Upload to Blob
     const devicesJson = JSON.stringify(devices);
     const blob = await put(
@@ -42,6 +51,7 @@ async function migrateSession(session: SessionRow): Promise<void> {
         access: 'public',
         contentType: 'application/json',
         addRandomSuffix: false,
+        token: blobToken,
       }
     );
     
