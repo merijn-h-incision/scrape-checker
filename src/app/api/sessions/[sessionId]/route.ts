@@ -30,7 +30,7 @@ export async function GET(
       );
     }
 
-    // Get session from database
+    // Get session metadata from database
     const sessionData = await getSession(sessionId);
 
     if (!sessionData) {
@@ -62,11 +62,34 @@ export async function GET(
       }
     }
 
+    // Fetch devices from Blob if blob_url exists
+    if (sessionData.blob_url) {
+      try {
+        console.log(`[API] Fetching devices from Blob: ${sessionData.blob_url}`);
+        const blobResponse = await fetch(sessionData.blob_url);
+        if (!blobResponse.ok) {
+          throw new Error(`Failed to fetch devices from Blob: ${blobResponse.status}`);
+        }
+        const devices = await blobResponse.json();
+        sessionData.devices = devices;
+        console.log(`[API] Loaded ${devices.length} devices from Blob`);
+      } catch (error) {
+        console.error('[API] Error fetching devices from Blob:', error);
+        // Fall back to empty array if Blob fetch fails
+        sessionData.devices = [];
+      }
+    }
+    // else: devices are still in JSONB (old sessions), already loaded by rowToSession
+
     console.log(`[API] Session ${sessionId} loaded successfully (version ${sessionData._version}, ${sessionData.devices?.length || 0} devices)`);
+
+    // Remove blob_url from response (internal detail)
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { blob_url, ...sessionWithoutBlobUrl } = sessionData;
 
     return NextResponse.json({
       success: true,
-      session: sessionData,
+      session: sessionWithoutBlobUrl,
     });
   } catch (error) {
     console.error('[API] Error loading session:', error);

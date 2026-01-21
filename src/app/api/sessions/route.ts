@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { put } from '@vercel/blob';
 import { auth } from '@/auth';
 import type { CheckingSession } from '@/types/device';
 import {
@@ -47,6 +48,21 @@ export async function POST(request: Request) {
       sessionData = JSON.parse(bodyText);
     }
 
+    // Upload devices array to Blob storage
+    console.log(`[API] Uploading ${sessionData.devices.length} devices to Blob`);
+    const devicesJson = JSON.stringify(sessionData.devices);
+    const blob = await put(
+      `sessions/${sessionData.session_id}/devices.json`,
+      devicesJson,
+      {
+        access: 'public',
+        contentType: 'application/json',
+        addRandomSuffix: false, // Use consistent filename for overwriting
+      }
+    );
+    const blobUrl = blob.url;
+    console.log(`[API] Devices uploaded to Blob: ${blobUrl}`);
+
     // Check if session exists in database
     const existingSession = await getSession(sessionData.session_id);
     
@@ -59,7 +75,7 @@ export async function POST(request: Request) {
       const currentVersion = existingSession._version || 1;
       
       try {
-        const result = await updateSession(sessionData, currentVersion);
+        const result = await updateSession(sessionData, blobUrl, currentVersion);
         savedSession = result;
         console.log(`[API] Session ${sessionData.session_id} updated successfully (version ${currentVersion} → ${result.version})`);
       } catch (error) {
@@ -93,7 +109,7 @@ export async function POST(request: Request) {
     } else {
       // Create new session
       action = 'created';
-      const result = await createSession(sessionData, userId);
+      const result = await createSession(sessionData, blobUrl, userId);
       savedSession = result;
       console.log(`[API] Session ${sessionData.session_id} created successfully (${sessionData.devices.length} devices)`);
     }

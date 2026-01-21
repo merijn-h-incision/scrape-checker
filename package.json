@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "next lint",
     "migrate:blob-to-postgres": "tsx scripts/migrate-blob-to-postgres.ts",
-    "migrate:dry-run": "DRY_RUN=true tsx scripts/migrate-blob-to-postgres.ts"
+    "migrate:dry-run": "DRY_RUN=true tsx scripts/migrate-blob-to-postgres.ts",
+    "migrate:to-blob-hybrid": "tsx scripts/migrate-existing-sessions-to-blob.ts"
   },
   "dependencies": {
     "@types/papaparse": "^5.3.16",

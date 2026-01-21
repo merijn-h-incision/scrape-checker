@@ -20,7 +20,8 @@ export interface SessionRow {
   created_at: string;
   updated_at: string;
   version: number;
-  devices: unknown; // JSONB
+  devices: unknown; // JSONB (deprecated, will be null for new sessions)
+  blob_url: string | null; // Blob storage URL for device data
   locked_by: string | null;
   locked_at: string | null;
   device_count: number;
@@ -64,9 +65,11 @@ export class SessionLockedError extends Error {
 
 /**
  * Create a new session in the database
+ * Devices are stored in Blob, only metadata in Postgres
  */
 export async function createSession(
   session: CheckingSession,
+  blobUrl: string,
   userId?: string
 ): Promise<SessionRow> {
   const completedBatches = session.completed_batches || [];
@@ -91,7 +94,7 @@ export async function createSession(
       current_batch,
       total_batches,
       completed_batches,
-      devices,
+      blob_url,
       version,
       device_count,
       completed_device_count
@@ -105,7 +108,7 @@ export async function createSession(
       ${session.current_batch || 1},
       ${session.total_batches},
       ${completedBatchesArray}::integer[],
-      ${JSON.stringify(session.devices)}::jsonb,
+      ${blobUrl},
       1,
       ${deviceCount},
       ${completedDeviceCount}
@@ -212,9 +215,11 @@ export async function refreshSessionLock(
 /**
  * Update a session with optimistic locking
  * Throws OptimisticLockError if version mismatch detected
+ * Devices are stored in Blob, only metadata in Postgres
  */
 export async function updateSession(
   session: CheckingSession,
+  blobUrl: string,
   expectedVersion: number
 ): Promise<SessionRow> {
   const completedBatches = session.completed_batches || [];
@@ -235,7 +240,7 @@ export async function updateSession(
       progress_percentage = ${session.progress_percentage},
       current_batch = ${session.current_batch || 1},
       completed_batches = ${completedBatchesArray}::integer[],
-      devices = ${JSON.stringify(session.devices)}::jsonb,
+      blob_url = ${blobUrl},
       device_count = ${deviceCount},
       completed_device_count = ${completedDeviceCount},
       version = version + 1
@@ -335,13 +340,20 @@ export async function logSessionActivity(
 /**
  * Convert database row to CheckingSession
  */
+/**
+ * Convert database row to session object
+ * NOTE: Devices are NOT included - they're stored in Blob
+ * Caller must fetch devices from blob_url separately
+ */
 function rowToSession(row: SessionRow): CheckingSession & { _version: number } {
-  // Postgres JSONB is already parsed as JavaScript object
-  const devices = Array.isArray(row.devices) 
-    ? row.devices 
-    : typeof row.devices === 'string' 
-      ? JSON.parse(row.devices) 
-      : [];
+  // For backward compatibility: check if devices are still in JSONB (old sessions)
+  const devices = row.devices && !row.blob_url
+    ? (Array.isArray(row.devices) 
+        ? row.devices 
+        : typeof row.devices === 'string' 
+          ? JSON.parse(row.devices) 
+          : [])
+    : []; // Empty array - devices will be fetched from Blob by API layer
 
   return {
     id: row.id,
@@ -357,6 +369,7 @@ function rowToSession(row: SessionRow): CheckingSession & { _version: number } {
     last_updated: row.updated_at,
     devices: devices,
     _version: row.version,
+    blob_url: row.blob_url || undefined, // Include for API layer use
   };
 }
 
