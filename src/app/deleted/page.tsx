@@ -28,7 +28,7 @@ function formatDate(dateString: string | undefined | null): string {
 }
 
 export default function DeletedSessionsPage() {
-  const { data: session, status } = useSession();
+  useSession(); // Ensure user is authenticated
   const [deletedSessions, setDeletedSessions] = useState<SessionMetadata[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);

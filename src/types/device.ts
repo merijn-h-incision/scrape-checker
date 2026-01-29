@@ -87,6 +87,8 @@ export interface SessionMetadata {
   created_at: string;
   device_count?: number;
   completed_device_count?: number;
+  deleted_at?: string | null; // For deleted sessions
+  days_remaining?: number; // Days until permanent deletion (for deleted sessions)
 }
 
 // Store state interface
