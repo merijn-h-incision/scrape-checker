@@ -183,6 +183,11 @@ export default function HomePage() {
   }, [router, resumeSessionId, setSession]);
 
   const handleDeleteSession = useCallback(async (sessionId: string) => {
+    // Confirm deletion
+    if (!confirm('Move this session to Recently Deleted? It will be permanently deleted after 14 days.')) {
+      return;
+    }
+
     try {
       const response = await fetch(`/api/sessions/${sessionId}`, {
         method: 'DELETE',
@@ -323,7 +328,16 @@ export default function HomePage() {
                 </p>
               </div>
             </div>
-            <AuthButton />
+            <div className="flex items-center gap-4">
+              <button
+                onClick={() => router.push('/deleted')}
+                className="flex items-center gap-2 px-3 py-2 text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
+              >
+                <Trash2 className="w-4 h-4" />
+                <span>Recently Deleted</span>
+              </button>
+              <AuthButton />
+            </div>
           </div>
         </div>
       </header>

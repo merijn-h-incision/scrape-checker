@@ -105,7 +105,7 @@ export async function GET(
 }
 
 /**
- * PATCH - Unlock or refresh session lock
+ * PATCH - Unlock, refresh session lock, or restore deleted session
  */
 export async function PATCH(
   request: NextRequest,
@@ -116,34 +116,64 @@ export async function PATCH(
     const session = await auth();
     const userId = session?.user?.email || undefined;
     const body = await request.json();
-    const action = body.action; // 'unlock' or 'refresh'
+    const action = body.action; // 'unlock', 'refresh', or 'restore'
 
-    if (!sessionId || !userId) {
+    if (!sessionId) {
       return NextResponse.json(
-        { error: 'Session ID and user required' },
+        { error: 'Session ID required' },
         { status: 400 }
       );
     }
 
     if (action === 'unlock') {
+      if (!userId) {
+        return NextResponse.json(
+          { error: 'User required for unlock' },
+          { status: 400 }
+        );
+      }
       await unlockSession(sessionId, userId);
       console.log(`[API] Session ${sessionId} unlocked by ${userId}`);
     } else if (action === 'refresh') {
+      if (!userId) {
+        return NextResponse.json(
+          { error: 'User required for refresh' },
+          { status: 400 }
+        );
+      }
       await refreshSessionLock(sessionId, userId);
+    } else if (action === 'restore') {
+      const { restoreSession } = await import('@/lib/db');
+      await restoreSession(sessionId);
+      console.log(`[API] Session ${sessionId} restored by ${userId || 'unknown'}`);
+      
+      // Log the restoration
+      await logSessionActivity(
+        sessionId,
+        'created', // Log as created since it's back in active sessions
+        userId,
+        undefined,
+        { restored: true }
+      );
+    } else {
+      return NextResponse.json(
+        { error: 'Invalid action' },
+        { status: 400 }
+      );
     }
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error('[API] Error updating session lock:', error);
+    console.error('[API] Error updating session:', error);
     return NextResponse.json(
-      { error: 'Failed to update lock' },
+      { error: 'Failed to update session' },
       { status: 500 }
     );
   }
 }
 
 /**
- * DELETE - Delete a session
+ * DELETE - Soft delete a session (moves to "Recently Deleted" for 14 days)
  */
 export async function DELETE(
   request: NextRequest,
@@ -161,7 +191,7 @@ export async function DELETE(
       );
     }
 
-    // Log the deletion BEFORE deleting (foreign key constraint requires session to exist)
+    // Log the deletion BEFORE soft-deleting
     try {
       await logSessionActivity(sessionId, 'deleted', userId);
     } catch (error) {
@@ -169,14 +199,14 @@ export async function DELETE(
       console.warn('[API] Failed to log deletion activity:', error);
     }
 
-    // Delete the session from database
+    // Soft delete the session (mark as deleted, keep for 14 days)
     await deleteSession(sessionId);
 
-    console.log(`[API] Session ${sessionId} deleted successfully`);
+    console.log(`[API] Session ${sessionId} soft-deleted successfully (will be permanently deleted after 14 days)`);
 
     return NextResponse.json({
       success: true,
-      message: `Session ${sessionId} deleted successfully`,
+      message: `Session moved to Recently Deleted. It will be permanently deleted after 14 days.`,
     });
   } catch (error) {
     console.error('[API] Error deleting session:', error);

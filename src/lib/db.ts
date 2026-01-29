@@ -39,6 +39,8 @@ export interface SessionSummary {
   last_updated: string; // Alias for updated_at
   device_count: number;
   completed_device_count: number;
+  deleted_at?: string | null; // For deleted sessions
+  days_remaining?: number; // Days until permanent deletion
 }
 
 export class OptimisticLockError extends Error {
@@ -271,13 +273,75 @@ export async function updateSession(
 }
 
 /**
- * Delete a session
+ * Soft delete a session (mark as deleted, keep for 14 days)
  */
 export async function deleteSession(sessionId: string): Promise<void> {
+  await sql`
+    UPDATE sessions
+    SET deleted_at = NOW()
+    WHERE session_id = ${sessionId}
+      AND deleted_at IS NULL
+  `;
+}
+
+/**
+ * Restore a soft-deleted session
+ */
+export async function restoreSession(sessionId: string): Promise<void> {
+  await sql`
+    UPDATE sessions
+    SET deleted_at = NULL
+    WHERE session_id = ${sessionId}
+      AND deleted_at IS NOT NULL
+  `;
+}
+
+/**
+ * Permanently delete a session (cannot be undone)
+ */
+export async function permanentlyDeleteSession(sessionId: string): Promise<void> {
   await sql`
     DELETE FROM sessions
     WHERE session_id = ${sessionId}
   `;
+}
+
+/**
+ * List deleted sessions (for "Recently Deleted" page)
+ */
+export async function listDeletedSessions(
+  userId?: string,
+  limit: number = 100
+): Promise<SessionSummary[]> {
+  let result;
+
+  if (userId) {
+    result = await sql<SessionSummary>`
+      SELECT * FROM deleted_sessions
+      WHERE user_id = ${userId}
+      ORDER BY deleted_at DESC
+      LIMIT ${limit}
+    `;
+  } else {
+    result = await sql<SessionSummary>`
+      SELECT * FROM deleted_sessions
+      ORDER BY deleted_at DESC
+      LIMIT ${limit}
+    `;
+  }
+
+  return result.rows;
+}
+
+/**
+ * Clean up sessions that have been deleted for more than 14 days
+ */
+export async function cleanupOldDeletedSessions(): Promise<number> {
+  const result = await sql<{ deleted_count: number }>`
+    SELECT * FROM cleanup_old_deleted_sessions()
+  `;
+
+  return result.rows[0]?.deleted_count || 0;
 }
 
 /**
