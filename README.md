@@ -63,6 +63,13 @@ See [AUTH_SETUP.md](./AUTH_SETUP.md) for complete setup instructions.
 - Material category and subcategory columns
 - Complete audit trail of review process
 
+### 🗑️ Recently Deleted (14-Day Safety Net)
+- **Soft Delete**: Deleted sessions retained for 14 days before permanent removal
+- **One-Click Restore**: Easily recover accidentally deleted sessions
+- **Days Remaining**: Clear countdown showing time until permanent deletion
+- **Complete Recovery**: All progress and device data preserved
+- **Color-Coded Warnings**: Red alerts for sessions expiring in ≤3 days
+
 ## 🚀 Getting Started
 
 ### Prerequisites
@@ -117,6 +124,11 @@ pnpm dev
 
 3. **Export Results**: Download the completed review as a CSV file with all selections and categorizations
 
+4. **Recently Deleted**: Access the "Recently Deleted" page from the header to:
+   - View sessions deleted within the last 14 days
+   - Restore accidentally deleted sessions with one click
+   - See countdown timers for automatic permanent deletion
+
 ## 🛠️ Technical Stack
 
 - **Framework**: Next.js 15 with App Router
@@ -132,17 +144,27 @@ pnpm dev
 
 ```
 src/
-├── app/                 # Next.js app router pages
-├── components/          # Reusable UI components
-│   ├── BatchHeader.tsx  # Batch navigation and progress
-│   ├── DeviceRow.tsx    # Individual device review interface
-│   ├── ExportModal.tsx  # Export configuration dialog
+├── app/                      # Next.js app router pages
+│   ├── page.tsx              # Home page with session list
+│   ├── deleted/              # Recently Deleted page
+│   ├── check/[sessionId]/    # Device review interface
+│   └── api/                  # API routes
+│       └── sessions/         # Session management endpoints
+├── components/               # Reusable UI components
+│   ├── BatchHeader.tsx       # Batch navigation and progress
+│   ├── DeviceRow.tsx         # Individual device review interface
+│   ├── ExportModal.tsx       # Export configuration dialog
 │   └── ImageWithFallback.tsx # Image loading component
-├── store/              # Zustand state management
-├── types/              # TypeScript type definitions
-└── utils/              # Utility functions and constants
-    ├── categories.ts   # Material category definitions
-    └── csvParser.ts    # CSV processing utilities
+├── lib/                      # Core utilities
+│   └── db.ts                 # Database functions with soft-delete support
+├── store/                    # Zustand state management
+├── types/                    # TypeScript type definitions
+└── utils/                    # Utility functions and constants
+    ├── categories.ts         # Material category definitions
+    └── csvParser.ts          # CSV processing utilities
+scripts/
+├── add-soft-delete.sql       # Database migration for soft-delete
+└── cleanup-deleted-sessions.ts # Maintenance script for old sessions
 ```
 
 ## 🔧 Session Management
@@ -165,8 +187,10 @@ The application uses **Vercel Postgres** to store and manage review sessions, pr
 - **Resume Work**: Continue sessions from any device
 - **Version Control**: Track changes with version numbers
 - **Activity Logging**: Full audit trail of all session changes
+- **Recently Deleted**: 14-day safety net for accidentally deleted sessions
+- **Automatic Cleanup**: Old deleted sessions removed automatically after retention period
 
-See [POSTGRES_SETUP.md](./POSTGRES_SETUP.md) for complete setup and migration instructions.
+See [POSTGRES_SETUP.md](./POSTGRES_SETUP.md) and [RECENTLY_DELETED.md](./RECENTLY_DELETED.md) for complete documentation.
 
 ## 📈 Performance Features
 
@@ -176,6 +200,18 @@ See [POSTGRES_SETUP.md](./POSTGRES_SETUP.md) for complete setup and migration in
 - **Sub-10ms Queries**: Edge-optimized database queries with Neon
 - **Connection Pooling**: Automatic scaling for concurrent users
 - **Responsive Design**: Works on desktop and tablet devices
+- **Indexed Soft-Delete**: Efficient querying of active vs deleted sessions
+
+## 🛡️ Data Safety Features
+
+- **14-Day Retention**: Deleted sessions preserved for recovery
+- **Soft Delete System**: Sessions marked as deleted, not immediately removed
+- **One-Click Restore**: Easy recovery from Recently Deleted page
+- **Automatic Cleanup**: Sessions permanently removed after 14 days
+- **Complete Data Preservation**: All progress, images, and notes retained during retention period
+- **Activity Logging**: Full audit trail of deletions and restorations
+
+Run `pnpm cleanup:deleted` to manually trigger cleanup of sessions older than 14 days.
 
 ## 🤝 Contributing
 
