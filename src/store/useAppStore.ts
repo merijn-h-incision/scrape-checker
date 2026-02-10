@@ -8,6 +8,8 @@ interface AppStore extends AppState, AppActions {
     attemptedVersion: number;
   } | null;
   setConflictError: (error: { currentVersion: number; attemptedVersion: number } | null) => void;
+  hasUnsavedChanges: boolean;
+  lastSavedAt: string | null;
 }
 
 export const useAppStore = create<AppStore>((set, get) => ({
@@ -18,6 +20,8 @@ export const useAppStore = create<AppStore>((set, get) => ({
   is_loading: false,
   error: null,
   conflictError: null,
+  hasUnsavedChanges: false,
+  lastSavedAt: null,
 
   // Actions
   setSession: (session: CheckingSession) => {
@@ -46,7 +50,9 @@ export const useAppStore = create<AppStore>((set, get) => ({
       current_batch: updatedSession.current_batch || 1,
       selected_device_index: 0,
       error: null,
-      conflictError: null
+      conflictError: null,
+      hasUnsavedChanges: false,
+      lastSavedAt: null,
     });
   },
 
@@ -70,7 +76,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
       last_updated: new Date().toISOString()
     };
 
-    set({ session: updatedSession });
+    set({ session: updatedSession, hasUnsavedChanges: true });
   },
 
   setCurrentBatch: (batchNumber: number) => {
@@ -81,6 +87,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
     set({ 
       current_batch: batchNumber,
       selected_device_index: deviceIndex,
+      hasUnsavedChanges: true,
       session: {
         ...session,
         current_batch: batchNumber
@@ -276,6 +283,8 @@ export const useAppStore = create<AppStore>((set, get) => ({
           _version: result.version,
         },
         conflictError: null, // Clear any previous conflict errors
+        hasUnsavedChanges: false,
+        lastSavedAt: new Date().toISOString(),
       });
 
     } catch (error) {

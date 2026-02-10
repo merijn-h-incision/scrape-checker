@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, Download, Save, Cloud } from 'lucide-react';
+import { ArrowLeft, Download, Save, Cloud, AlertCircle } from 'lucide-react';
 import { useAppStore, useCurrentBatch } from '@/store/useAppStore';
 import { useAutoSave } from '@/hooks/useAutoSave';
 import { BatchHeader } from '@/components/BatchHeader';
@@ -15,11 +15,12 @@ import { SessionLockedModal } from '@/components/SessionLockedModal';
 
 export default function CheckPage({ params }: { params: Promise<{ sessionId: string }> }) {
   const router = useRouter();
-  const { session, current_batch, setCurrentBatch, saveProgress, exportResults, setSession } = useAppStore();
+  const { session, current_batch, setCurrentBatch, saveProgress, exportResults, setSession, hasUnsavedChanges, lastSavedAt } = useAppStore();
   const currentBatch = useCurrentBatch();
   const { saveNow, isAutoSaveActive } = useAutoSave();
   const [showExportModal, setShowExportModal] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const [isLoadingSession, setIsLoadingSession] = useState(false);
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [sessionLocked, setSessionLocked] = useState<{
@@ -109,36 +110,46 @@ export default function CheckPage({ params }: { params: Promise<{ sessionId: str
     return () => clearInterval(heartbeat);
   }, [sessionId, session]);
 
-  // Unlock session when leaving page
+  // Warn about unsaved changes when closing/refreshing the tab
   useEffect(() => {
-    if (!sessionId || !session) return;
-
-    const unlockSession = async () => {
-      try {
-        await fetch(`/api/sessions/${sessionId}`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action: 'unlock' }),
-        });
-        console.log('Session unlocked');
-      } catch (error) {
-        console.error('Failed to unlock session:', error);
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      // Always unlock the session
+      if (sessionId) {
+        const data = JSON.stringify({ action: 'unlock' });
+        navigator.sendBeacon(`/api/sessions/${sessionId}`, data);
       }
-    };
 
-    // Unlock on page unload
-    const handleBeforeUnload = () => {
-      // Use sendBeacon for reliable delivery during unload
-      const data = JSON.stringify({ action: 'unlock' });
-      navigator.sendBeacon(`/api/sessions/${sessionId}`, data);
+      // Warn user if there are unsaved changes
+      if (useAppStore.getState().hasUnsavedChanges) {
+        e.preventDefault();
+        // Modern browsers show a generic message, but we need to set returnValue
+        e.returnValue = 'You have unsaved changes. Are you sure you want to leave?';
+        return e.returnValue;
+      }
     };
 
     window.addEventListener('beforeunload', handleBeforeUnload);
 
-    // Unlock when component unmounts (navigation away)
     return () => {
       window.removeEventListener('beforeunload', handleBeforeUnload);
-      unlockSession();
+    };
+  }, [sessionId]);
+
+  // Unlock session when component unmounts (in-app navigation)
+  useEffect(() => {
+    if (!sessionId || !session) return;
+
+    return () => {
+      // Unlock when navigating away within the app
+      fetch(`/api/sessions/${sessionId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'unlock' }),
+      }).then(() => {
+        console.log('Session unlocked');
+      }).catch((error) => {
+        console.error('Failed to unlock session:', error);
+      });
     };
   }, [sessionId, session]);
 
@@ -150,14 +161,35 @@ export default function CheckPage({ params }: { params: Promise<{ sessionId: str
   // Save functions
   const handleSaveAndPause = useCallback(async () => {
     setIsSaving(true);
+    setSaveError(null);
     try {
       await saveNow();
     } catch (error) {
       console.error('Save failed:', error);
+      setSaveError('Save failed! Please check your connection and try again.');
+      // Auto-clear error after 10 seconds
+      setTimeout(() => setSaveError(null), 10000);
     } finally {
       setIsSaving(false);
     }
   }, [saveNow]);
+
+  // Save before navigating back to home
+  const handleNavigateBack = useCallback(async () => {
+    if (hasUnsavedChanges) {
+      setIsSaving(true);
+      try {
+        await saveNow();
+        console.log('Saved before navigating away');
+      } catch (error) {
+        console.error('Save before navigation failed:', error);
+        // Still navigate even if save fails - user chose to leave
+      } finally {
+        setIsSaving(false);
+      }
+    }
+    router.push('/');
+  }, [hasUnsavedChanges, saveNow, router]);
 
   // Keyboard navigation
   useEffect(() => {
@@ -239,11 +271,12 @@ export default function CheckPage({ params }: { params: Promise<{ sessionId: str
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-4">
               <button
-                onClick={() => router.push('/')}
-                className="flex items-center space-x-2 text-muted-foreground hover:text-foreground transition-colors"
+                onClick={handleNavigateBack}
+                disabled={isSaving}
+                className="flex items-center space-x-2 text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
               >
                 <ArrowLeft className="w-4 h-4" />
-                <span className="text-sm">Back to Upload</span>
+                <span className="text-sm">{isSaving ? 'Saving...' : 'Back to Upload'}</span>
               </button>
               
               <div className="border-l border-border pl-4">
@@ -260,18 +293,32 @@ export default function CheckPage({ params }: { params: Promise<{ sessionId: str
             </div>
 
             <div className="flex items-center space-x-3">
-              {/* Auto-save status indicator */}
-              {isAutoSaveActive && (
+              {/* Save status indicator */}
+              {hasUnsavedChanges ? (
+                <div className="flex items-center space-x-1 text-xs text-amber-500">
+                  <AlertCircle className="w-3 h-3" />
+                  <span>Unsaved changes</span>
+                </div>
+              ) : lastSavedAt ? (
+                <div className="flex items-center space-x-1 text-xs text-emerald-500">
+                  <Cloud className="w-3 h-3" />
+                  <span>Saved</span>
+                </div>
+              ) : isAutoSaveActive ? (
                 <div className="flex items-center space-x-1 text-xs text-muted-foreground">
                   <Cloud className="w-3 h-3" />
                   <span>Auto-save active</span>
                 </div>
-              )}
+              ) : null}
               
               <button
                 onClick={handleSaveAndPause}
                 disabled={isSaving}
-                className="flex items-center space-x-2 px-3 py-2 text-sm border border-border rounded-lg hover:bg-accent transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className={`flex items-center space-x-2 px-3 py-2 text-sm border rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
+                  hasUnsavedChanges
+                    ? 'border-amber-500/50 bg-amber-500/10 hover:bg-amber-500/20 text-amber-600'
+                    : 'border-border hover:bg-accent'
+                }`}
               >
                 <Save className={`w-4 h-4 ${isSaving ? 'animate-pulse' : ''}`} />
                 <span>{isSaving ? 'Saving...' : 'Save Progress'}</span>
@@ -292,6 +339,25 @@ export default function CheckPage({ params }: { params: Promise<{ sessionId: str
           </div>
         </div>
       </header>
+
+      {/* Save Error Banner */}
+      {saveError && (
+        <div className="bg-red-500/10 border-b border-red-500/20 px-6 py-3">
+          <div className="max-w-6xl mx-auto flex items-center justify-between">
+            <div className="flex items-center space-x-2 text-red-600">
+              <AlertCircle className="w-4 h-4" />
+              <span className="text-sm font-medium">{saveError}</span>
+            </div>
+            <button
+              onClick={handleSaveAndPause}
+              disabled={isSaving}
+              className="text-sm px-3 py-1 bg-red-500 text-white rounded hover:bg-red-600 transition-colors disabled:opacity-50"
+            >
+              {isSaving ? 'Retrying...' : 'Retry Save'}
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Main Content */}
       <main className="max-w-6xl mx-auto px-6 py-8">
