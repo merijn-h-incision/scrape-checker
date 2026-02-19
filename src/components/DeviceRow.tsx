@@ -397,6 +397,26 @@ export function DeviceRow({ device, deviceIndex, rowNumber }: DeviceRowProps) {
                 </h4>
                 
                 <div className="space-y-2 max-h-32 overflow-y-auto">
+                  {/* No manual option */}
+                  <div
+                    className={`
+                      flex items-center justify-between p-3 border rounded-lg transition-colors cursor-pointer
+                      ${!selectedManualUrl
+                        ? 'border-primary bg-primary/5'
+                        : 'border-border hover:border-primary/50 hover:bg-accent'
+                      }
+                    `}
+                    onClick={() => handleManualSelect('')}
+                  >
+                    <div className="flex items-center space-x-2">
+                      <X className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                      <span className="text-sm font-medium text-foreground">No manual</span>
+                    </div>
+                    {!selectedManualUrl && (
+                      <Check className="w-4 h-4 text-success" />
+                    )}
+                  </div>
+
                   {manualUrls.map((url, index) => {
                     const isSelected = url === selectedManualUrl;
                     const isPrimary = url === device.manual_url;
@@ -412,7 +432,7 @@ export function DeviceRow({ device, deviceIndex, rowNumber }: DeviceRowProps) {
                             : 'border-border hover:border-primary/50 hover:bg-accent'
                           }
                         `}
-                        onClick={() => handleManualSelect(url)}
+                        onClick={() => handleManualSelect(isSelected ? '' : url)}
                       >
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center space-x-2">

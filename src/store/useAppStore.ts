@@ -37,7 +37,9 @@ export const useAppStore = create<AppStore>((set, get) => ({
         row_index: (index % 10) + 1,
         status: device.status || 'pending',
         selected_image_url: device.selected_image_url || device.image_url,
-        selected_manual_url: device.selected_manual_url || device.manual_url,
+        selected_manual_url: device.selected_manual_url !== undefined
+            ? device.selected_manual_url
+            : device.manual_url,
         custom_image_url: device.custom_image_url || '',
         custom_type: device.custom_type || '',
         material_category: device.material_category || '',
@@ -169,7 +171,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
       }
 
       if (options.include_manuals) {
-        result.manual_url = device.selected_manual_url || device.manual_url;
+        result.manual_url = device.selected_manual_url ?? device.manual_url;
         result.manual_urls = device.manual_urls;
         result.selected_manual_url = device.selected_manual_url;
       }
