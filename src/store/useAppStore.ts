@@ -42,8 +42,8 @@ export const useAppStore = create<AppStore>((set, get) => ({
             : device.manual_url,
         custom_image_url: device.custom_image_url || '',
         custom_type: device.custom_type || '',
-        material_category: device.material_category || '',
-        material_subcategory: device.material_subcategory || ''
+        material_category: device.material_category || 'DISPOSABLES',
+        material_subcategory: device.material_subcategory || 'OTHER DISPOSABLES'
       }))
     };
     
